@@ -34,3 +34,22 @@ export const resetPasswordSchema = z.object({
     })
 });
 
+// ── Mobile OTP Auth ───────────────────────────────────────────────────────────
+
+export const sendMobileOTPSchema = z.object({
+    body: z.object({
+        // Accepts formats like: 9876543210  or  +919876543210
+        mobile: z
+            .string()
+            .regex(/^\+?[1-9]\d{6,14}$/, "Enter a valid mobile number (e.g. +919876543210)")
+    })
+});
+
+export const verifyMobileOTPSchema = z.object({
+    body: z.object({
+        mobile: z
+            .string()
+            .regex(/^\+?[1-9]\d{6,14}$/, "Enter a valid mobile number"),
+        otpCode: z.string().length(6, "OTP must be exactly 6 digits")
+    })
+});

@@ -143,7 +143,103 @@ const options = {
                         },
                     },
                 },
+
+                // ── Mobile OTP Auth ───────────────────────────────────────
+                SendMobileOTPRequest: {
+                    type: "object",
+                    required: ["mobile"],
+                    properties: {
+                        mobile: {
+                            type: "string",
+                            example: "+919876543210",
+                            description: "E.164 format preferred (e.g. +919876543210). Plain 10-digit numbers also accepted.",
+                        },
+                    },
+                },
+
+                VerifyMobileOTPRequest: {
+                    type: "object",
+                    required: ["mobile", "otpCode"],
+                    properties: {
+                        mobile: {
+                            type: "string",
+                            example: "+919876543210",
+                        },
+                        otpCode: {
+                            type: "string",
+                            minLength: 6,
+                            maxLength: 6,
+                            example: "482910",
+                            description: "The 6-digit OTP sent via SMS.",
+                        },
+                    },
+                },
+
+                MobileAuthUserResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Mobile verification successful." },
+                        user: {
+                            type: "object",
+                            properties: {
+                                id: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0d" },
+                                mobile: { type: "string", example: "+919876543210" },
+                            },
+                        },
+                    },
+                },
+
+                // ── User Profile ─────────────────────────────────────────
+                UpdateProfileRequest: {
+                    type: "object",
+                    properties: {
+                        name: {
+                            type: "string",
+                            example: "Santhosh",
+                            description: "2–50 characters",
+                        },
+                        age: {
+                            type: "integer",
+                            example: 25,
+                            description: "1–120",
+                        },
+                        email: {
+                            type: "string",
+                            format: "email",
+                            example: "santhosh@example.com",
+                        },
+                        phoneNo: {
+                            type: "string",
+                            example: "+919876543210",
+                        },
+                    },
+                },
+
+                UserProfileResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Profile fetched successfully." },
+                        data: {
+                            type: "object",
+                            properties: {
+                                _id: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0d" },
+                                name: { type: "string", example: "Santhosh" },
+                                age: { type: "integer", example: 25 },
+                                email: { type: "string", example: "santhosh@example.com" },
+                                phoneNo: { type: "string", example: "+919876543210" },
+                                role: { type: "string", example: "user" },
+                                isEmailVerified: { type: "boolean", example: false },
+                                isPhoneVerified: { type: "boolean", example: true },
+                                createdAt: { type: "string", format: "date-time" },
+                                updatedAt: { type: "string", format: "date-time" },
+                            },
+                        },
+                    },
+                },
             },
+
 
             // ── Cookie-based JWT auth (accessToken) ────────────────────────
             securitySchemes: {

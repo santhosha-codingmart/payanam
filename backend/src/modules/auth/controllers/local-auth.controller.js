@@ -2,11 +2,14 @@ import {
   registerByEmail,
   loginByEmail,
   requestPasswordReset,
-  verifyAndResetPassword
+  verifyAndResetPassword,
+  sendMobileOTP,
+  verifyMobileOTP
 } from "../services/local-auth.service.js";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../services/jwt.service.js";
 import RefreshToken from "../models/refresh-token.model.js";
 import User from "../../users/models/user.model.js";
+import { ApiError } from "../../../utils/ApiError.js";
 
 const cookieOptions = (ms) => ({
   httpOnly: true,
@@ -17,20 +20,14 @@ const cookieOptions = (ms) => ({
 
 
 export const register = async (req, res, next) => {
-
   try {
-
     const user = await registerByEmail(req.body);
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    await RefreshToken.create({
-      userId: user._id,
-      token: refreshToken
-    });
+    await RefreshToken.create({ userId: user._id, token: refreshToken });
 
     res.cookie("accessToken", accessToken, cookieOptions(15 * 60 * 1000));
-
     res.cookie("refreshToken", refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000));
 
     return res.status(201).json({
@@ -38,7 +35,6 @@ export const register = async (req, res, next) => {
       message: "User registered successfully",
       user: { id: user._id, email: user.email },
     });
-
   } catch (error) {
     return next(error);
   }
@@ -46,15 +42,11 @@ export const register = async (req, res, next) => {
 
 export const login = async (req, res, next) => {
   try {
-
     const user = await loginByEmail(req.body);
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    await RefreshToken.create({
-      userId: user._id,
-      token: refreshToken
-    });
+    await RefreshToken.create({ userId: user._id, token: refreshToken });
 
     res.cookie("accessToken", accessToken, cookieOptions(15 * 60 * 1000));
     res.cookie("refreshToken", refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000));
@@ -64,7 +56,6 @@ export const login = async (req, res, next) => {
       message: "Login successful",
       user: { id: user._id, email: user.email }
     });
-
   } catch (error) {
     return next(error);
   }
@@ -75,57 +66,34 @@ export const refresh = async (req, res, next) => {
     const token = req.cookies?.refreshToken;
 
     if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: "No refresh token provided",
-      });
+      return res.status(401).json({ success: false, message: "No refresh token provided" });
     }
 
-    // Verify refresh token JWT
     const isValid = await verifyRefreshToken(token);
-
     if (!isValid) {
-      return res.status(401).json({
-        success: false,
-        message: "Refresh token expired or invalid",
-      });
+      return res.status(401).json({ success: false, message: "Refresh token expired or invalid" });
     }
 
-    // Check if refresh token exists in DB
     const refreshDoc = await RefreshToken.findOne({ token });
-
     if (!refreshDoc) {
-      return res.status(401).json({
-        success: false,
-        message: "Refresh token not found",
-      });
+      return res.status(401).json({ success: false, message: "Refresh token not found" });
     }
 
-    // Get user
     const user = await User.findById(refreshDoc.userId);
-
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "User not found",
-      });
+      return res.status(401).json({ success: false, message: "User not found" });
     }
 
-    // Generate new access token
     const accessToken = generateAccessToken(user);
 
-    // Send access token as cookie
     res.cookie("accessToken", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 15 * 60 * 1000, // 15 minutes
+      maxAge: 15 * 60 * 1000,
     });
 
-    return res.status(200).json({
-      success: true,
-      message: "Access token refreshed successfully",
-    });
+    return res.status(200).json({ success: true, message: "Access token refreshed successfully" });
   } catch (error) {
     return next(error);
   }
@@ -134,10 +102,9 @@ export const refresh = async (req, res, next) => {
 export const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
-
     await requestPasswordReset(email);
 
-    // Security Best Practice: Return 200 OK whether the user exists or not
+    // Security Best Practice: always return 200 whether the email exists or not
     return res.status(200).json({
       success: true,
       message: "If an account exists, an OTP has been sent to your email."
@@ -150,12 +117,102 @@ export const forgotPassword = async (req, res, next) => {
 export const resetPasswordController = async (req, res, next) => {
   try {
     const { email, otpCode, newPassword } = req.body;
-
     await verifyAndResetPassword(email, otpCode, newPassword);
 
     return res.status(200).json({
       success: true,
       message: "Password reset correctly! You can now log in."
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MOBILE OTP AUTH
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/auth/mobile/send-otp
+ * Step 1: receive mobile number, send OTP via SMS.
+ */
+export const sendMobileOTPController = async (req, res, next) => {
+  try {
+    const { mobile } = req.body;
+    await sendMobileOTP(mobile);
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP sent to your mobile number. It is valid for 5 minutes."
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * POST /api/auth/mobile/verify-otp
+ * Step 2: receive mobile + OTP, verify it, then auto login-or-register.
+ * Returns tokens in cookies exactly like email login does.
+ */
+export const verifyMobileOTPController = async (req, res, next) => {
+  try {
+    const { mobile, otpCode } = req.body;
+
+    // Service handles both login AND register internally
+    const user = await verifyMobileOTP(mobile, otpCode);
+
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+
+    await RefreshToken.create({ userId: user._id, token: refreshToken });
+
+    res.cookie("accessToken", accessToken, cookieOptions(15 * 60 * 1000));
+    res.cookie("refreshToken", refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000));
+
+    return res.status(200).json({
+      success: true,
+      message: "Mobile verification successful.",
+      user: { id: user._id, mobile: user.phoneNo }
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOGOUT
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/auth/logout
+ * Clears both auth cookies and deletes the refresh token from the database.
+ * This ensures the session is invalidated on both client AND server side.
+ */
+export const logout = async (req, res, next) => {
+  try {
+    const refreshToken = req.cookies?.refreshToken;
+
+    // Delete the refresh token from MongoDB (if it exists)
+    if (refreshToken) {
+      await RefreshToken.findOneAndDelete({ token: refreshToken });
+    }
+
+    // Clear both cookies by setting them to empty with immediate expiry
+    res.clearCookie("accessToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "none"
+    });
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "none"
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Logged out successfully."
     });
   } catch (error) {
     return next(error);
