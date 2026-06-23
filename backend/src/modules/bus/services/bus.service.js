@@ -1,14 +1,21 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Bus Service — The Business Brain
+// This is where all the actual work happens. Controllers just pass data here.
+// Services interact with MongoDB (via Mongoose models), enforce business rules
+// (like "only the owner can edit this"), and throw ApiErrors if things go wrong.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { Bus } from "../models/bus.model.js";
 import { Route } from "../models/route.model.js";
 import { Schedule } from "../models/schedule.model.js";
 import { ApiError } from "../../../utils/ApiError.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BUS CRUD (vendor-only)
+// BUS CRUD (Vendor-only)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const createBusService = async (operatorId, payload) => {
-    // Check for duplicate registration number
+    // 1. Enforce uniqueness: Bus registration numbers must be globally unique
     const existing = await Bus.findOne({
         registrationNumber: payload.registrationNumber.toUpperCase(),
     });
@@ -16,7 +23,7 @@ export const createBusService = async (operatorId, payload) => {
         throw new ApiError(409, "A bus with this registration number already exists.");
     }
 
-    // Check for duplicate bus number
+    // 2. Enforce uniqueness: Bus numbers must also be unique
     const existingBusNum = await Bus.findOne({
         busNumber: payload.busNumber.toUpperCase(),
     });
@@ -24,6 +31,8 @@ export const createBusService = async (operatorId, payload) => {
         throw new ApiError(409, "A bus with this bus number already exists.");
     }
 
+    // 3. Create the bus. Notice we inject `operatorId` here from the token,
+    // ensuring the vendor who made the request is set as the owner.
     const bus = await Bus.create({
         ...payload,
         operatorId,
@@ -34,10 +43,14 @@ export const createBusService = async (operatorId, payload) => {
     return bus;
 };
 
+// Gets all buses owned by the logged-in vendor
 export const getVendorBusesService = async (operatorId) => {
+    // We sort by createdAt: -1 to show the newest buses first
     return await Bus.find({ operatorId }).sort({ createdAt: -1 });
 };
 
+// Gets a specific bus by its ID. Used by vendors to view their own bus details,
+// or by admins.
 export const getBusByIdService = async (busId) => {
     const bus = await Bus.findById(busId);
     if (!bus) {
@@ -46,30 +59,35 @@ export const getBusByIdService = async (busId) => {
     return bus;
 };
 
+// Updates a bus's details (partial update)
 export const updateBusService = async (busId, operatorId, updateData) => {
     const bus = await Bus.findById(busId);
     if (!bus) {
         throw new ApiError(404, "Bus not found.");
     }
 
-    // Ownership check — vendor can only update their own buses
+    // ── OWNERSHIP CHECK ──
+    // This is crucial. Even if you have the ID of another vendor's bus,
+    // you cannot edit it unless your operatorId matches the bus's operatorId.
+    // We use .toString() because MongoDB ObjectIds are objects, not strings.
     if (bus.operatorId.toString() !== operatorId.toString()) {
         throw new ApiError(403, "You can only update your own buses.");
     }
 
-    // If registration number is being changed, check uniqueness
+    // If registration number is being changed, we must verify the new one
+    // isn't already taken by SOME OTHER bus (_id: { $ne: busId }).
     if (updateData.registrationNumber) {
         updateData.registrationNumber = updateData.registrationNumber.toUpperCase();
         const duplicate = await Bus.findOne({
             registrationNumber: updateData.registrationNumber,
-            _id: { $ne: busId },
+            _id: { $ne: busId }, // $ne = not equal
         });
         if (duplicate) {
             throw new ApiError(409, "Another bus with this registration number already exists.");
         }
     }
 
-    // If bus number is being changed, check uniqueness
+    // Same duplicate check for busNumber
     if (updateData.busNumber) {
         updateData.busNumber = updateData.busNumber.toUpperCase();
         const duplicate = await Bus.findOne({
@@ -81,62 +99,74 @@ export const updateBusService = async (busId, operatorId, updateData) => {
         }
     }
 
+    // Object.assign merges the new fields into the existing Mongoose document
     Object.assign(bus, updateData);
-    await bus.save();
+    await bus.save(); // Save triggers Mongoose validation before writing to DB
     return bus;
 };
 
+// Deletes a bus and everything associated with it
 export const deleteBusService = async (busId, operatorId) => {
     const bus = await Bus.findById(busId);
     if (!bus) {
         throw new ApiError(404, "Bus not found.");
     }
 
+    // ── OWNERSHIP CHECK ──
     if (bus.operatorId.toString() !== operatorId.toString()) {
         throw new ApiError(403, "You can only delete your own buses.");
     }
 
-    // Cascade delete: remove all schedules and routes for this bus
+    // ── CASCADE DELETE ──
+    // If we just deleted the bus, we would leave "orphaned" routes and schedules
+    // in the database that point to a bus that no longer exists.
+    // So we delete them first.
     await Schedule.deleteMany({ busId });
     await Route.deleteMany({ busId });
+    
+    // Finally, delete the bus itself
     await Bus.findByIdAndDelete(busId);
 
     return true;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ROUTE MANAGEMENT (vendor-only)
+// ROUTE MANAGEMENT (Vendor-only)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const createRouteService = async (operatorId, routeData) => {
-    // Verify bus exists and belongs to this vendor
+    // 1. Verify the bus exists
     const bus = await Bus.findById(routeData.busId);
     if (!bus) {
         throw new ApiError(404, "Bus not found.");
     }
+    
+    // 2. Verify the vendor actually owns this bus
     if (bus.operatorId.toString() !== operatorId.toString()) {
         throw new ApiError(403, "You can only create routes for your own buses.");
     }
 
-    // Sort stops by order
+    // 3. Ensure stops are sorted by their `order` property ascending.
+    // This protects against a frontend bug sending them out of order.
     routeData.stops.sort((a, b) => a.order - b.order);
 
     const route = await Route.create(routeData);
     return route;
 };
 
+// Fetch all routes defined for a specific bus
 export const getRoutesForBusService = async (busId) => {
     return await Route.find({ busId }).sort({ createdAt: -1 });
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SCHEDULE MANAGEMENT (vendor-only)
+// SCHEDULE MANAGEMENT (Vendor-only)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const createScheduleService = async (operatorId, scheduleData) => {
     const { routeId, busId, departureDate, departureTime, arrivalTime, baseFare } = scheduleData;
 
-    // Verify bus exists and belongs to vendor
+    // 1. Verify bus exists and belongs to vendor
     const bus = await Bus.findById(busId);
     if (!bus) {
         throw new ApiError(404, "Bus not found.");
@@ -145,7 +175,7 @@ export const createScheduleService = async (operatorId, scheduleData) => {
         throw new ApiError(403, "You can only create schedules for your own buses.");
     }
 
-    // Verify route exists and belongs to this bus
+    // 2. Verify route exists and actually belongs to this bus
     const route = await Route.findById(routeId);
     if (!route) {
         throw new ApiError(404, "Route not found.");
@@ -154,7 +184,8 @@ export const createScheduleService = async (operatorId, scheduleData) => {
         throw new ApiError(400, "This route does not belong to the specified bus.");
     }
 
-    // Check for duplicate schedule (same bus + date + time)
+    // 3. Duplicate check: Prevent creating two trips for the exact same bus
+    // at the exact same time on the exact same date.
     const duplicate = await Schedule.findOne({
         busId,
         departureDate: new Date(departureDate),
@@ -164,7 +195,9 @@ export const createScheduleService = async (operatorId, scheduleData) => {
         throw new ApiError(409, "A schedule already exists for this bus on this date and time.");
     }
 
-    // Copy bus.seatLayout into the schedule's seats — all set to AVAILABLE
+    // 4. ── THE SEAT SNAPSHOT ──
+    // Here we take the bus's `seatLayout` template and create a new array
+    // of seats for this specific trip. We add the `status: "AVAILABLE"` field.
     const seats = bus.seatLayout.map((seat) => ({
         seatNumber: seat.seatNumber,
         seatType: seat.seatType,
@@ -173,7 +206,7 @@ export const createScheduleService = async (operatorId, scheduleData) => {
         column: seat.column,
         isSleeper: seat.isSleeper,
         fare: seat.fare || baseFare,
-        status: "AVAILABLE",
+        status: "AVAILABLE", // Default status
         bookedBy: null,
         passengerName: null,
         passengerAge: null,
@@ -188,10 +221,11 @@ export const createScheduleService = async (operatorId, scheduleData) => {
         departureTime,
         arrivalTime,
         baseFare,
-        availableSeats: seats.length,
+        availableSeats: seats.length, // Start with all seats available
         seats,
         boardingPoints: scheduleData.boardingPoints || [],
         droppingPoints: scheduleData.droppingPoints || [],
+        // Apply default refund policy if the vendor didn't provide one
         cancellationPolicy: scheduleData.cancellationPolicy || [
             { hoursBeforeDeparture: 24, refundPercentage: 75 },
             { hoursBeforeDeparture: 12, refundPercentage: 50 },
@@ -203,7 +237,13 @@ export const createScheduleService = async (operatorId, scheduleData) => {
     return schedule;
 };
 
+// Gets the full seat map for a specific trip, used by the frontend to render the bus layout
 export const getScheduleSeatsService = async (scheduleId) => {
+    // ── .populate() ──
+    // Schedule only stores `busId` and `routeId`.
+    // .populate() tells Mongoose to automatically fetch the related Bus and Route
+    // documents and replace the ID with the actual object.
+    // The `select` option tells it to only fetch the fields we actually need.
     const schedule = await Schedule.findById(scheduleId)
         .populate({ path: "busId", select: "busName busType busNumber amenities seatLayoutType photos averageRating" })
         .populate({ path: "routeId", select: "source destination stops distanceInKm estimatedDurationInMinutes" });
@@ -212,17 +252,18 @@ export const getScheduleSeatsService = async (scheduleId) => {
         throw new ApiError(404, "Schedule not found.");
     }
 
+    // We return a flattened object that's easy for the frontend to consume
     return {
         scheduleId: schedule._id,
-        bus: schedule.busId,
-        route: schedule.routeId,
+        bus: schedule.busId,         // Populated bus object
+        route: schedule.routeId,     // Populated route object
         departureDate: schedule.departureDate,
         departureTime: schedule.departureTime,
         arrivalTime: schedule.arrivalTime,
         baseFare: schedule.baseFare,
         availableSeats: schedule.availableSeats,
         totalSeats: schedule.seats.length,
-        seats: schedule.seats,
+        seats: schedule.seats,       // The actual array of seat statuses
         boardingPoints: schedule.boardingPoints,
         droppingPoints: schedule.droppingPoints,
         cancellationPolicy: schedule.cancellationPolicy,
@@ -231,15 +272,18 @@ export const getScheduleSeatsService = async (scheduleId) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SEARCH (public — no auth required)
+// SEARCH (Public — No auth required)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const searchBusesService = async (from, to, date, filters = {}) => {
+    // Use regex to allow case-insensitive searching (e.g., "chennai" matches "Chennai")
+    // ^ means "start of string", $ means "end of string", "i" means case-insensitive
     const fromRegex = new RegExp(`^${from}$`, "i");
     const toRegex = new RegExp(`^${to}$`, "i");
 
-    // Step 1: Find routes where BOTH "from" and "to" cities exist
-    //         — either as source/destination OR inside the stops array
+    // ── STEP 1: Find matching routes ──
+    // We look for routes where BOTH the "from" city AND "to" city exist somewhere
+    // in the route (either as the main source/destination, OR in the stops array).
     const routes = await Route.find({
         status: "ACTIVE",
         $and: [
@@ -259,20 +303,21 @@ export const searchBusesService = async (from, to, date, filters = {}) => {
     });
 
     if (routes.length === 0) {
-        return [];
+        return []; // No routes exist between these two cities
     }
 
-    // Step 2: Filter routes for directional correctness
-    //         "from" stop must come BEFORE "to" stop in order
+    // ── STEP 2: Verify direction ──
+    // Just because a route contains both cities doesn't mean it goes in the right direction!
+    // E.g., a Chennai→Bangalore route has both cities, but we shouldn't show it for
+    // a Bangalore→Chennai search.
     const validRoutes = [];
 
     for (const route of routes) {
-        // Find the order of "from" city in the stops list
+        // Find the specific objects in the `stops` array for the requested cities
         const fromStop = route.stops.find((s) => fromRegex.test(s.city));
-        // Find the order of "to" city in the stops list
         const toStop = route.stops.find((s) => toRegex.test(s.city));
 
-        // Both cities must exist in stops and "from" must come before "to"
+        // Ensure the "from" city comes BEFORE the "to" city in the route's order
         if (fromStop && toStop && fromStop.order < toStop.order) {
             validRoutes.push({
                 routeId: route._id,
@@ -288,67 +333,78 @@ export const searchBusesService = async (from, to, date, filters = {}) => {
         return [];
     }
 
+    // Get an array of just the valid route IDs
     const routeIds = validRoutes.map((r) => r.routeId);
 
-    // Step 3: Build the schedule query
+    // ── STEP 3: Find schedules for these routes on the given date ──
     const searchDate = new Date(date);
     const nextDay = new Date(date);
-    nextDay.setDate(nextDay.getDate() + 1);
+    nextDay.setDate(nextDay.getDate() + 1); // Used to query a 24-hour window
 
     const scheduleQuery = {
         routeId: { $in: routeIds },
+        // departureDate is >= searchDate AND < nextDay
         departureDate: { $gte: searchDate, $lt: nextDay },
         status: "SCHEDULED",
-        availableSeats: { $gt: 0 },
+        availableSeats: { $gt: 0 }, // Don't show fully booked buses
     };
 
-    // Step 4: Apply optional filters
+    // ── STEP 4: Apply frontend filters (Bus Level) ──
     const busQuery = {};
     if (filters.busType) {
         busQuery.busType = filters.busType;
     }
     if (filters.isAC !== undefined) {
-        busQuery.isAC = filters.isAC === "true";
+        busQuery.isAC = filters.isAC === "true"; // Convert string to boolean
     }
 
-    // Step 5: Fetch schedules with populated bus and route info
+    // ── STEP 5: Execute the query with populations ──
     let query = Schedule.find(scheduleQuery)
         .populate({
             path: "busId",
             select: "busName busType busNumber amenities seatLayoutType isAC isSleeper isSeater averageRating totalRatings photos operatorName",
+            // The `match` option here acts like an INNER JOIN condition.
+            // If the bus doesn't match the busQuery (e.g., user wants AC but bus is Non-AC),
+            // Mongoose will set `busId` to null for this schedule.
             match: Object.keys(busQuery).length > 0 ? busQuery : undefined,
         })
         .populate({
             path: "routeId",
             select: "source destination stops distanceInKm estimatedDurationInMinutes farePerKm",
         })
-        .select("-seats") // Exclude full seat array from search results
-        .sort({ departureTime: 1 });
+        // Exclude the massive `seats` array to keep the payload small.
+        // Users will fetch the seat map later when they click on a specific bus.
+        .select("-seats") 
+        .sort({ departureTime: 1 }); // Sort by time ascending (morning to night)
 
     let schedules = await query;
 
-    // Filter out schedules where busId is null (bus didn't match bus filters)
+    // Remove schedules where the bus was filtered out (busId is null)
     schedules = schedules.filter((s) => s.busId !== null);
 
-    // Step 6: Enrich results with boarding/dropping info and calculated fare
+    // ── STEP 6: Enrich results and calculate fares ──
     const routeMap = new Map(validRoutes.map((r) => [r.routeId.toString(), r]));
 
     schedules = schedules.map((schedule) => {
+        // Mongoose documents must be converted to plain JS objects before we can add new properties
         const scheduleObj = schedule.toObject();
         const routeInfo = routeMap.get(schedule.routeId._id.toString());
 
         if (routeInfo) {
-            // Add the user's specific boarding and dropping stop info
+            // Attach the exact boarding and dropping info for the user's search
             scheduleObj.boardingStop = routeInfo.boardingStop;
             scheduleObj.droppingStop = routeInfo.droppingStop;
 
-            // Calculate fare for this specific segment if farePerKm is set
+            // Calculate the distance between the boarding and dropping cities
             const segmentDistance =
                 routeInfo.droppingStop.distanceFromSource - routeInfo.boardingStop.distanceFromSource;
 
+            // Calculate proportional fare: farePerKm * distance
+            // E.g., 2.5 rs/km * 220 km = 550 rs
             if (routeInfo.farePerKm > 0 && segmentDistance > 0) {
                 scheduleObj.calculatedFare = Math.round(routeInfo.farePerKm * segmentDistance);
             } else {
+                // Fallback to the base fare if no farePerKm is defined
                 scheduleObj.calculatedFare = scheduleObj.baseFare;
             }
         }
@@ -356,7 +412,7 @@ export const searchBusesService = async (from, to, date, filters = {}) => {
         return scheduleObj;
     });
 
-    // Step 7: Apply price filter (on calculatedFare)
+    // ── STEP 7: Apply price filters (now that we know the calculated fare) ──
     if (filters.minPrice) {
         schedules = schedules.filter(
             (s) => (s.calculatedFare || s.baseFare) >= Number(filters.minPrice)
@@ -368,7 +424,7 @@ export const searchBusesService = async (from, to, date, filters = {}) => {
         );
     }
 
-    // Step 8: Apply sort
+    // ── STEP 8: Apply sorting (if requested) ──
     if (filters.sortBy === "price_low") {
         schedules.sort((a, b) => (a.calculatedFare || a.baseFare) - (b.calculatedFare || b.baseFare));
     } else if (filters.sortBy === "price_high") {

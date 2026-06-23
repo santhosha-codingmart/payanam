@@ -1,25 +1,40 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Bus Controller — The HTTP Bridge
+// Controllers should be extremely thin. Their ONLY job is to:
+// 1. Extract data from the incoming HTTP Request (`req`)
+// 2. Pass that data to the Service layer to do the actual work
+// 3. Take the result from the Service and format it into an HTTP Response (`res`)
+// 4. Catch any errors and pass them to the global error handler (`next`)
+// ─────────────────────────────────────────────────────────────────────────────
+
 import * as busService from "../services/bus.service.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BUS CRUD (vendor-only)
+// BUS CRUD (Vendor-only)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const createBus = async (req, res, next) => {
     try {
+        // req.user._id comes from the `authenticate` middleware
+        // req.body comes from the user (and is already validated by Zod)
         const bus = await busService.createBusService(req.user._id, req.body);
 
+        // 201 Created is the standard HTTP status for a successful POST
         return res.status(201).json({
             success: true,
             message: "Bus created successfully.",
             data: bus,
         });
     } catch (error) {
+        // next(error) passes the error down the Express middleware chain
+        // until it hits our global error handler in `error.middleware.js`
         next(error);
     }
 };
 
 export const getVendorBuses = async (req, res, next) => {
     try {
+        // Vendors can only see their own buses
         const buses = await busService.getVendorBusesService(req.user._id);
 
         return res.status(200).json({
@@ -35,6 +50,7 @@ export const getVendorBuses = async (req, res, next) => {
 
 export const getBusById = async (req, res, next) => {
     try {
+        // req.params.id comes from the URL path: /api/v1/buses/:id
         const bus = await busService.getBusByIdService(req.params.id);
 
         return res.status(200).json({
@@ -50,7 +66,7 @@ export const updateBus = async (req, res, next) => {
     try {
         const bus = await busService.updateBusService(
             req.params.id,
-            req.user._id,
+            req.user._id, // Pass user ID so service can check ownership
             req.body
         );
 
@@ -78,7 +94,7 @@ export const deleteBus = async (req, res, next) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ROUTE (vendor-only)
+// ROUTE (Vendor-only)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const createRoute = async (req, res, next) => {
@@ -110,7 +126,7 @@ export const getRoutesForBus = async (req, res, next) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SCHEDULE (vendor-only)
+// SCHEDULE (Vendor-only)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const createSchedule = async (req, res, next) => {
@@ -127,6 +143,7 @@ export const createSchedule = async (req, res, next) => {
     }
 };
 
+// Gets the full seat map for the frontend to render the bus layout
 export const getScheduleSeats = async (req, res, next) => {
     try {
         const seatData = await busService.getScheduleSeatsService(req.params.scheduleId);
@@ -142,12 +159,16 @@ export const getScheduleSeats = async (req, res, next) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SEARCH (public)
+// SEARCH (Public — No auth required)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const searchBuses = async (req, res, next) => {
     try {
+        // req.query pulls parameters from the URL
+        // E.g., /search?from=Chennai&to=Bangalore&date=2026-06-25&isAC=true
+        // The `...filters` syntax puts any extra params (like isAC, minPrice) into an object
         const { from, to, date, ...filters } = req.query;
+        
         const results = await busService.searchBusesService(from, to, date, filters);
 
         return res.status(200).json({

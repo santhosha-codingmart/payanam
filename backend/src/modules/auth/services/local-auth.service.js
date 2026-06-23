@@ -71,8 +71,10 @@ export const requestPasswordReset = async (email) => {
     // 3. Save to Redis with a 300 second (5 min) Time To Live barrier
     await redis.set(`otp:${email}`, otpCode, "EX", 300);
 
-    // 4. Send the email
-    await sendOTPEmail(email, otpCode);
+    // 4. Send the email asynchronously (fire and forget) so we don't block the API response for 8 seconds
+    sendOTPEmail(email, otpCode).catch((err) => {
+        console.error("Failed to send OTP email in background:", err);
+    });
 
     return true;
 };
@@ -121,8 +123,10 @@ export const sendMobileOTP = async (mobile) => {
     //    with email-based "otp:" keys used in forgot-password
     await redis.set(`mobile-otp:${mobile}`, otpCode, "EX", 300); // 5 min TTL
 
-    // 3. Fire the SMS
-    await sendOTPSms(mobile, otpCode);
+    // 3. Fire the SMS asynchronously (fire and forget) so we don't block the API response
+    sendOTPSms(mobile, otpCode).catch((err) => {
+        console.error("Failed to send OTP SMS in background:", err);
+    });
 
     return true;
 };
