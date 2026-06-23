@@ -37,6 +37,12 @@ const routeSchema = new mongoose.Schema(
             min: 1,
         },
 
+        farePerKm: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+
         estimatedDurationInMinutes: {
             type: Number,
             required: true,
@@ -56,5 +62,7 @@ const routeSchema = new mongoose.Schema(
 
 // Compound index for fast search: "from city → to city"
 routeSchema.index({ "source.city": 1, "destination.city": 1 });
+// Index on intermediate stops for stop-aware search
+routeSchema.index({ "stops.city": 1 });
 
 export const Route = mongoose.model("Route", routeSchema);

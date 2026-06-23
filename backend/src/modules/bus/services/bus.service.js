@@ -235,20 +235,62 @@ export const getScheduleSeatsService = async (scheduleId) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const searchBusesService = async (from, to, date, filters = {}) => {
-    // Step 1: Find routes matching source → destination (case-insensitive)
+    const fromRegex = new RegExp(`^${from}$`, "i");
+    const toRegex = new RegExp(`^${to}$`, "i");
+
+    // Step 1: Find routes where BOTH "from" and "to" cities exist
+    //         — either as source/destination OR inside the stops array
     const routes = await Route.find({
-        "source.city": { $regex: new RegExp(`^${from}$`, "i") },
-        "destination.city": { $regex: new RegExp(`^${to}$`, "i") },
         status: "ACTIVE",
+        $and: [
+            {
+                $or: [
+                    { "source.city": fromRegex },
+                    { "stops.city": fromRegex },
+                ],
+            },
+            {
+                $or: [
+                    { "destination.city": toRegex },
+                    { "stops.city": toRegex },
+                ],
+            },
+        ],
     });
 
     if (routes.length === 0) {
         return [];
     }
 
-    const routeIds = routes.map((r) => r._id);
+    // Step 2: Filter routes for directional correctness
+    //         "from" stop must come BEFORE "to" stop in order
+    const validRoutes = [];
 
-    // Step 2: Build the schedule query
+    for (const route of routes) {
+        // Find the order of "from" city in the stops list
+        const fromStop = route.stops.find((s) => fromRegex.test(s.city));
+        // Find the order of "to" city in the stops list
+        const toStop = route.stops.find((s) => toRegex.test(s.city));
+
+        // Both cities must exist in stops and "from" must come before "to"
+        if (fromStop && toStop && fromStop.order < toStop.order) {
+            validRoutes.push({
+                routeId: route._id,
+                boardingStop: fromStop,
+                droppingStop: toStop,
+                farePerKm: route.farePerKm || 0,
+                totalDistanceInKm: route.distanceInKm,
+            });
+        }
+    }
+
+    if (validRoutes.length === 0) {
+        return [];
+    }
+
+    const routeIds = validRoutes.map((r) => r.routeId);
+
+    // Step 3: Build the schedule query
     const searchDate = new Date(date);
     const nextDay = new Date(date);
     nextDay.setDate(nextDay.getDate() + 1);
@@ -260,7 +302,7 @@ export const searchBusesService = async (from, to, date, filters = {}) => {
         availableSeats: { $gt: 0 },
     };
 
-    // Step 3: Apply optional filters
+    // Step 4: Apply optional filters
     const busQuery = {};
     if (filters.busType) {
         busQuery.busType = filters.busType;
@@ -269,7 +311,7 @@ export const searchBusesService = async (from, to, date, filters = {}) => {
         busQuery.isAC = filters.isAC === "true";
     }
 
-    // Step 4: Fetch schedules with populated bus and route info
+    // Step 5: Fetch schedules with populated bus and route info
     let query = Schedule.find(scheduleQuery)
         .populate({
             path: "busId",
@@ -278,7 +320,7 @@ export const searchBusesService = async (from, to, date, filters = {}) => {
         })
         .populate({
             path: "routeId",
-            select: "source destination stops distanceInKm estimatedDurationInMinutes",
+            select: "source destination stops distanceInKm estimatedDurationInMinutes farePerKm",
         })
         .select("-seats") // Exclude full seat array from search results
         .sort({ departureTime: 1 });
@@ -288,19 +330,49 @@ export const searchBusesService = async (from, to, date, filters = {}) => {
     // Filter out schedules where busId is null (bus didn't match bus filters)
     schedules = schedules.filter((s) => s.busId !== null);
 
-    // Step 5: Apply price filter if provided
+    // Step 6: Enrich results with boarding/dropping info and calculated fare
+    const routeMap = new Map(validRoutes.map((r) => [r.routeId.toString(), r]));
+
+    schedules = schedules.map((schedule) => {
+        const scheduleObj = schedule.toObject();
+        const routeInfo = routeMap.get(schedule.routeId._id.toString());
+
+        if (routeInfo) {
+            // Add the user's specific boarding and dropping stop info
+            scheduleObj.boardingStop = routeInfo.boardingStop;
+            scheduleObj.droppingStop = routeInfo.droppingStop;
+
+            // Calculate fare for this specific segment if farePerKm is set
+            const segmentDistance =
+                routeInfo.droppingStop.distanceFromSource - routeInfo.boardingStop.distanceFromSource;
+
+            if (routeInfo.farePerKm > 0 && segmentDistance > 0) {
+                scheduleObj.calculatedFare = Math.round(routeInfo.farePerKm * segmentDistance);
+            } else {
+                scheduleObj.calculatedFare = scheduleObj.baseFare;
+            }
+        }
+
+        return scheduleObj;
+    });
+
+    // Step 7: Apply price filter (on calculatedFare)
     if (filters.minPrice) {
-        schedules = schedules.filter((s) => s.baseFare >= Number(filters.minPrice));
+        schedules = schedules.filter(
+            (s) => (s.calculatedFare || s.baseFare) >= Number(filters.minPrice)
+        );
     }
     if (filters.maxPrice) {
-        schedules = schedules.filter((s) => s.baseFare <= Number(filters.maxPrice));
+        schedules = schedules.filter(
+            (s) => (s.calculatedFare || s.baseFare) <= Number(filters.maxPrice)
+        );
     }
 
-    // Step 6: Apply sort
+    // Step 8: Apply sort
     if (filters.sortBy === "price_low") {
-        schedules.sort((a, b) => a.baseFare - b.baseFare);
+        schedules.sort((a, b) => (a.calculatedFare || a.baseFare) - (b.calculatedFare || b.baseFare));
     } else if (filters.sortBy === "price_high") {
-        schedules.sort((a, b) => b.baseFare - a.baseFare);
+        schedules.sort((a, b) => (b.calculatedFare || b.baseFare) - (a.calculatedFare || a.baseFare));
     } else if (filters.sortBy === "rating") {
         schedules.sort((a, b) => (b.busId?.averageRating || 0) - (a.busId?.averageRating || 0));
     } else if (filters.sortBy === "departure") {

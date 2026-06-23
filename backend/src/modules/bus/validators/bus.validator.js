@@ -119,6 +119,7 @@ export const createRouteSchema = z.object({
         destination: locationSchema,
         stops: z.array(stopSchema).min(2, "At least 2 stops required (source and destination)"),
         distanceInKm: z.number().min(1, "Distance must be at least 1 km"),
+        farePerKm: z.number().min(0, "Fare per km cannot be negative").optional(),
         estimatedDurationInMinutes: z.number().int().min(1, "Duration must be at least 1 minute"),
     }),
 });
