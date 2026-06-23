@@ -6,6 +6,7 @@ import busRouter from "./modules/bus/routes/bus.route.js";
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middleware/error.middleware.js";
 import swaggerSpec from "./config/swagger.js";
+import cors from "cors";
 
 const app = express();
 
