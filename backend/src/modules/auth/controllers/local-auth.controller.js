@@ -102,13 +102,20 @@ export const refresh = async (req, res, next) => {
 export const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+
+    // This will throw a 404 ApiError if the user does not exist, 
+    // sending a "User with this email does not exist" response to the frontend.
     await requestPasswordReset(email);
 
-    // Security Best Practice: always return 200 whether the email exists or not
     return res.status(200).json({
       success: true,
-      message: "If an account exists, an OTP has been sent to your email."
+      message: "OTP has been sent to your email."
     });
+
   } catch (error) {
     return next(error);
   }
@@ -139,12 +146,22 @@ export const resetPasswordController = async (req, res, next) => {
 export const sendMobileOTPController = async (req, res, next) => {
   try {
     const { mobile } = req.body;
-    await sendMobileOTP(mobile);
+    
+    if (!mobile) {
+      return res.status(400).json({ success: false, message: "Mobile number is required" });
+    }
 
-    return res.status(200).json({
+    // Respond immediately so frontend can redirect to OTP page without waiting
+    res.status(200).json({
       success: true,
       message: "OTP sent to your mobile number. It is valid for 5 minutes."
     });
+
+    // Run the OTP generation and SMS sending in the background
+    sendMobileOTP(mobile).catch(error => {
+      console.error("Background Mobile OTP error:", error.message);
+    });
+
   } catch (error) {
     return next(error);
   }

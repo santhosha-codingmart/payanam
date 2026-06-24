@@ -164,7 +164,7 @@ router.post('/logout', authenticate, logout);
  *     tags: [Auth - Email]
  *     description: >
  *       Generates a 6-digit OTP valid for **5 minutes** and emails it.
- *       Always returns 200 OK to prevent account enumeration.
+ *       Returns a 404 if the email does not exist in the system.
  *     requestBody:
  *       required: true
  *       content:
@@ -173,13 +173,19 @@ router.post('/logout', authenticate, logout);
  *             $ref: '#/components/schemas/ForgotPasswordRequest'
  *     responses:
  *       200:
- *         description: OTP sent (or silently skipped if email doesn't exist).
+ *         description: OTP sent successfully.
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/SuccessResponse'
  *       400:
  *         description: Invalid email format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: User with this email does not exist
  *         content:
  *           application/json:
  *             schema:
