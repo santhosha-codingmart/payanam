@@ -42,6 +42,13 @@ const scheduleSchema = new mongoose.Schema(
             required: true,
         },
 
+        // The date this trip ends (stores as a Date object at midnight UTC)
+        // Essential for overnight buses or long journeys
+        arrivalDate: {
+            type: Date,
+            required: true,
+        },
+
         // Local departure and arrival times for the full journey
         departureTime: {
             type: String, // Format: "HH:mm" (e.g., "22:30")
@@ -122,6 +129,7 @@ const scheduleSchema = new mongoose.Schema(
         // can get on/off the bus.
         boardingPoints: [
             {
+                city: { type: String, required: true, trim: true }, // E.g., "Chennai"
                 name: { type: String, required: true }, // e.g., "Koyambedu"
                 address: { type: String },
                 time: { type: String, required: true }, // "HH:mm"
@@ -131,6 +139,7 @@ const scheduleSchema = new mongoose.Schema(
 
         droppingPoints: [
             {
+                city: { type: String, required: true, trim: true }, // E.g., "Bangalore"
                 name: { type: String, required: true },
                 address: { type: String },
                 time: { type: String, required: true }, // "HH:mm"

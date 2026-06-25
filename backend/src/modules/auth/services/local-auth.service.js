@@ -68,13 +68,19 @@ export const requestPasswordReset = async (email) => {
     // 2. Generate a highly secure random 6-digit number
     const otpCode = crypto.randomInt(100000, 999999).toString();
 
-    // 3. Save to Redis with a 300 second (5 min) Time To Live barrier
-    await redis.set(`otp:${email}`, otpCode, "EX", 300);
+    // Run Redis and Email sending completely in the background using setTimeout
+    // This pushes them to the next event loop tick, ensuring the HTTP response is sent INSTANTLY
+    setTimeout(() => {
+        // 3. Save to Redis with a 300 second (5 min) Time To Live barrier
+        redis.set(`otp:${email}`, otpCode, "EX", 300).catch(err => {
+            console.error("Redis error saving OTP:", err);
+        });
 
-    // 4. Send the email asynchronously (fire and forget) so we don't block the API response for 8 seconds
-    sendOTPEmail(email, otpCode).catch((err) => {
-        console.error("Failed to send OTP email in background:", err);
-    });
+        // 4. Send the email asynchronously
+        sendOTPEmail(email, otpCode).catch((err) => {
+            console.error("Failed to send OTP email in background:", err);
+        });
+    }, 0);
 
     return true;
 };
@@ -119,14 +125,19 @@ export const sendMobileOTP = async (mobile) => {
     // 1. Generate a cryptographically secure 6-digit OTP
     const otpCode = crypto.randomInt(100000, 999999).toString();
 
-    // 2. Store in Redis — prefixed with "mobile-otp:" to avoid collision
-    //    with email-based "otp:" keys used in forgot-password
-    await redis.set(`mobile-otp:${mobile}`, otpCode, "EX", 300); // 5 min TTL
+    // Run Redis and SMS sending completely in the background using setTimeout
+    setTimeout(() => {
+        // 2. Store in Redis — prefixed with "mobile-otp:" to avoid collision
+        //    with email-based "otp:" keys used in forgot-password
+        redis.set(`mobile-otp:${mobile}`, otpCode, "EX", 300).catch(err => {
+            console.error("Redis error saving mobile OTP:", err);
+        });
 
-    // 3. Fire the SMS asynchronously (fire and forget) so we don't block the API response
-    sendOTPSms(mobile, otpCode).catch((err) => {
-        console.error("Failed to send OTP SMS in background:", err);
-    });
+        // 3. Fire the SMS asynchronously
+        sendOTPSms(mobile, otpCode).catch((err) => {
+            console.error("Failed to send OTP SMS in background:", err);
+        });
+    }, 0);
 
     return true;
 };

@@ -164,7 +164,7 @@ export const getRoutesForBusService = async (busId) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const createScheduleService = async (operatorId, scheduleData) => {
-    const { routeId, busId, departureDate, departureTime, arrivalTime, baseFare } = scheduleData;
+    const { routeId, busId, departureDate, arrivalDate, departureTime, arrivalTime, baseFare } = scheduleData;
 
     // 1. Verify bus exists and belongs to vendor
     const bus = await Bus.findById(busId);
@@ -218,6 +218,7 @@ export const createScheduleService = async (operatorId, scheduleData) => {
         busId,
         operatorId,
         departureDate: new Date(departureDate),
+        arrivalDate: new Date(arrivalDate),
         departureTime,
         arrivalTime,
         baseFare,
@@ -258,6 +259,7 @@ export const getScheduleSeatsService = async (scheduleId) => {
         bus: schedule.busId,         // Populated bus object
         route: schedule.routeId,     // Populated route object
         departureDate: schedule.departureDate,
+        arrivalDate: schedule.arrivalDate,
         departureTime: schedule.departureTime,
         arrivalTime: schedule.arrivalTime,
         baseFare: schedule.baseFare,
@@ -394,6 +396,14 @@ export const searchBusesService = async (from, to, date, filters = {}) => {
             // Attach the exact boarding and dropping info for the user's search
             scheduleObj.boardingStop = routeInfo.boardingStop;
             scheduleObj.droppingStop = routeInfo.droppingStop;
+
+            // Filter boarding and dropping points for the requested cities
+            scheduleObj.boardingPoints = (scheduleObj.boardingPoints || []).filter(
+                (bp) => fromRegex.test(bp.city)
+            );
+            scheduleObj.droppingPoints = (scheduleObj.droppingPoints || []).filter(
+                (dp) => toRegex.test(dp.city)
+            );
 
             // Calculate the distance between the boarding and dropping cities
             const segmentDistance =
