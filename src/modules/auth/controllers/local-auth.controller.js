@@ -20,7 +20,6 @@ const cookieOptions = (ms) => ({
   maxAge: ms,
 });
 
-
 export const register = async (req, res, next) => {
   try {
     const user = await registerByEmail(req.body);
