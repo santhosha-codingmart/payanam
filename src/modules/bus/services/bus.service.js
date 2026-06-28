@@ -364,7 +364,7 @@ export const searchBusesService = async (from, to, date, filters = {}) => {
     let query = Schedule.find(scheduleQuery)
         .populate({
             path: "busId",
-            select: "busName busType busNumber amenities seatLayoutType isAC isSleeper isSeater averageRating totalRatings photos operatorName",
+            select: "busName busType busNumber amenities seatLayoutType isAC isSleeper isSeater averageRating totalRatings photos operatorName totalSeats",
             // The `match` option here acts like an INNER JOIN condition.
             // If the bus doesn't match the busQuery (e.g., user wants AC but bus is Non-AC),
             // Mongoose will set `busId` to null for this schedule.
@@ -384,65 +384,112 @@ export const searchBusesService = async (from, to, date, filters = {}) => {
     // Remove schedules where the bus was filtered out (busId is null)
     schedules = schedules.filter((s) => s.busId !== null);
 
-    // ── STEP 6: Enrich results and calculate fares ──
+    // ── STEP 6: Enrich results and format to Frontend-Friendly Contract ──
     const routeMap = new Map(validRoutes.map((r) => [r.routeId.toString(), r]));
 
     schedules = schedules.map((schedule) => {
-        // Mongoose documents must be converted to plain JS objects before we can add new properties
         const scheduleObj = schedule.toObject();
         const routeInfo = routeMap.get(schedule.routeId._id.toString());
+        
+        let calculatedFare = scheduleObj.baseFare;
 
         if (routeInfo) {
-            // Attach the exact boarding and dropping info for the user's search
-            scheduleObj.boardingStop = routeInfo.boardingStop;
-            scheduleObj.droppingStop = routeInfo.droppingStop;
-
-            // Filter boarding and dropping points for the requested cities
-            scheduleObj.boardingPoints = (scheduleObj.boardingPoints || []).filter(
-                (bp) => fromRegex.test(bp.city)
-            );
-            scheduleObj.droppingPoints = (scheduleObj.droppingPoints || []).filter(
-                (dp) => toRegex.test(dp.city)
-            );
-
-            // Calculate the distance between the boarding and dropping cities
-            const segmentDistance =
-                routeInfo.droppingStop.distanceFromSource - routeInfo.boardingStop.distanceFromSource;
-
-            // Calculate proportional fare: farePerKm * distance
-            // E.g., 2.5 rs/km * 220 km = 550 rs
+            const segmentDistance = routeInfo.droppingStop.distanceFromSource - routeInfo.boardingStop.distanceFromSource;
             if (routeInfo.farePerKm > 0 && segmentDistance > 0) {
-                scheduleObj.calculatedFare = Math.round(routeInfo.farePerKm * segmentDistance);
-            } else {
-                // Fallback to the base fare if no farePerKm is defined
-                scheduleObj.calculatedFare = scheduleObj.baseFare;
+                calculatedFare = Math.round(routeInfo.farePerKm * segmentDistance);
             }
         }
 
-        return scheduleObj;
+        const filteredBoardingPoints = (scheduleObj.boardingPoints || []).filter(
+            (bp) => fromRegex.test(bp.city)
+        ).map(bp => ({
+            id: bp._id,
+            city: bp.city,
+            name: bp.name,
+            time: bp.time,
+            address: bp.address,
+            landmark: bp.landmark
+        }));
+
+        const filteredDroppingPoints = (scheduleObj.droppingPoints || []).filter(
+            (dp) => toRegex.test(dp.city)
+        ).map(dp => ({
+            id: dp._id,
+            city: dp.city,
+            name: dp.name,
+            time: dp.time,
+            address: dp.address,
+            landmark: dp.landmark
+        }));
+        
+        const cancellationPolicy = (scheduleObj.cancellationPolicy || []).map(cp => ({
+            hoursBeforeDeparture: cp.hoursBeforeDeparture,
+            refundPercentage: cp.refundPercentage
+        }));
+
+        return {
+            scheduleId: scheduleObj._id,
+            operator: {
+                id: scheduleObj.operatorId,
+                name: scheduleObj.busId?.operatorName || "Unknown"
+            },
+            bus: {
+                id: scheduleObj.busId?._id,
+                name: scheduleObj.busId?.busName,
+                number: scheduleObj.busId?.busNumber,
+                type: scheduleObj.busId?.busType,
+                layout: scheduleObj.busId?.seatLayoutType,
+                isAC: scheduleObj.busId?.isAC,
+                isSleeper: scheduleObj.busId?.isSleeper,
+                isSeater: scheduleObj.busId?.isSeater,
+                amenities: scheduleObj.busId?.amenities || [],
+                rating: scheduleObj.busId?.averageRating || 0
+            },
+            journey: {
+                departureDate: scheduleObj.departureDate,
+                arrivalDate: scheduleObj.arrivalDate,
+                departureTime: scheduleObj.departureTime,
+                arrivalTime: scheduleObj.arrivalTime,
+                durationMinutes: scheduleObj.routeId?.estimatedDurationInMinutes,
+                source: routeInfo ? routeInfo.boardingStop.city : scheduleObj.routeId?.source.city,
+                destination: routeInfo ? routeInfo.droppingStop.city : scheduleObj.routeId?.destination.city
+            },
+            pricing: {
+                baseFare: scheduleObj.baseFare,
+                calculatedFare: calculatedFare
+            },
+            seats: {
+                available: scheduleObj.availableSeats,
+                total: scheduleObj.busId?.totalSeats || scheduleObj.availableSeats
+            },
+            boardingPoints: filteredBoardingPoints,
+            droppingPoints: filteredDroppingPoints,
+            cancellationPolicy: cancellationPolicy,
+            status: scheduleObj.status
+        };
     });
 
-    // ── STEP 7: Apply price filters (now that we know the calculated fare) ──
+    // ── STEP 7: Apply price filters ──
     if (filters.minPrice) {
         schedules = schedules.filter(
-            (s) => (s.calculatedFare || s.baseFare) >= Number(filters.minPrice)
+            (s) => s.pricing.calculatedFare >= Number(filters.minPrice)
         );
     }
     if (filters.maxPrice) {
         schedules = schedules.filter(
-            (s) => (s.calculatedFare || s.baseFare) <= Number(filters.maxPrice)
+            (s) => s.pricing.calculatedFare <= Number(filters.maxPrice)
         );
     }
 
     // ── STEP 8: Apply sorting (if requested) ──
     if (filters.sortBy === "price_low") {
-        schedules.sort((a, b) => (a.calculatedFare || a.baseFare) - (b.calculatedFare || b.baseFare));
+        schedules.sort((a, b) => a.pricing.calculatedFare - b.pricing.calculatedFare);
     } else if (filters.sortBy === "price_high") {
-        schedules.sort((a, b) => (b.calculatedFare || b.baseFare) - (a.calculatedFare || a.baseFare));
+        schedules.sort((a, b) => b.pricing.calculatedFare - a.pricing.calculatedFare);
     } else if (filters.sortBy === "rating") {
-        schedules.sort((a, b) => (b.busId?.averageRating || 0) - (a.busId?.averageRating || 0));
+        schedules.sort((a, b) => b.bus.rating - a.bus.rating);
     } else if (filters.sortBy === "departure") {
-        schedules.sort((a, b) => a.departureTime.localeCompare(b.departureTime));
+        schedules.sort((a, b) => a.journey.departureTime.localeCompare(b.journey.departureTime));
     }
 
     return schedules;

@@ -98,109 +98,79 @@ function generateSeatLayout(layoutType, totalSeats, baseFare) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const vendorUsers = [
-    { name: "KPN Travels", email: "kpn@payanam.com", phoneNo: "+919000000001", password: "Vendor@123", role: "vendor", isEmailVerified: true, isPhoneVerified: true },
-    { name: "SRS Travels", email: "srs@payanam.com", phoneNo: "+919000000002", password: "Vendor@123", role: "vendor", isEmailVerified: true, isPhoneVerified: true },
-    { name: "Orange Travels", email: "orange@payanam.com", phoneNo: "+919000000003", password: "Vendor@123", role: "vendor", isEmailVerified: true, isPhoneVerified: true },
+    { name: "A1 Travels", email: "a1@payanam.com", phoneNo: "+919000000001", password: "Vendor@123", role: "vendor", isEmailVerified: true, isPhoneVerified: true },
+    { name: "Krish Travels", email: "krish@payanam.com", phoneNo: "+919000000002", password: "Vendor@123", role: "vendor", isEmailVerified: true, isPhoneVerified: true },
+    { name: "Rathimeena", email: "rathimeena@payanam.com", phoneNo: "+919000000003", password: "Vendor@123", role: "vendor", isEmailVerified: true, isPhoneVerified: true },
+    { name: "SRM Travels", email: "srm@payanam.com", phoneNo: "+919000000004", password: "Vendor@123", role: "vendor", isEmailVerified: true, isPhoneVerified: true },
+    { name: "YBM Travels", email: "ybm@payanam.com", phoneNo: "+919000000005", password: "Vendor@123", role: "vendor", isEmailVerified: true, isPhoneVerified: true },
 ];
 
 const busConfigs = [
-    { vendorIndex: 0, busName: "KPN Volvo Multi-Axle", busNumber: "TN01KPN001", registrationNumber: "TN01AB1234", busType: "AC_SLEEPER", seatLayoutType: "2+1_SLEEPER", totalSeats: 36, lowerDeckSeats: 18, upperDeckSeats: 18, sleeperSeats: 36, seaterSeats: 0, isAC: true, isSleeper: true, isSeater: false, amenities: ["WiFi", "Charging Point", "Blanket", "Water Bottle", "GPS Tracking"], isGPSAvailable: true, isLiveTrackingEnabled: true, baseFare: 800 },
-    { vendorIndex: 0, busName: "KPN Deluxe Seater", busNumber: "TN01KPN002", registrationNumber: "TN01AB1235", busType: "AC_SEATER", seatLayoutType: "2+2_SEATER", totalSeats: 44, lowerDeckSeats: 44, upperDeckSeats: 0, sleeperSeats: 0, seaterSeats: 44, isAC: true, isSleeper: false, isSeater: true, amenities: ["Charging Point", "Water Bottle", "GPS Tracking"], isGPSAvailable: true, isLiveTrackingEnabled: false, baseFare: 450 },
-    { vendorIndex: 1, busName: "SRS Luxury Sleeper", busNumber: "KA01SRS001", registrationNumber: "KA01CD5678", busType: "LUXURY_SLEEPER", seatLayoutType: "1+1_SLEEPER", totalSeats: 24, lowerDeckSeats: 12, upperDeckSeats: 12, sleeperSeats: 24, seaterSeats: 0, isAC: true, isSleeper: true, isSeater: false, amenities: ["WiFi", "Charging Point", "Blanket", "Water Bottle", "Reading Light", "CCTV"], isGPSAvailable: true, isLiveTrackingEnabled: true, baseFare: 1200 },
-    { vendorIndex: 1, busName: "SRS Semi-Sleeper", busNumber: "KA01SRS002", registrationNumber: "KA01CD5679", busType: "SEMI_SLEEPER", seatLayoutType: "2+1_SEATER", totalSeats: 36, lowerDeckSeats: 36, upperDeckSeats: 0, sleeperSeats: 0, seaterSeats: 36, isAC: true, isSleeper: false, isSeater: true, amenities: ["Charging Point", "Water Bottle"], isGPSAvailable: false, isLiveTrackingEnabled: false, baseFare: 550 },
-    { vendorIndex: 2, busName: "Orange Volvo 9600", busNumber: "AP01ORG001", registrationNumber: "AP01EF9012", busType: "VOLVO_AC", seatLayoutType: "2+1_SLEEPER", totalSeats: 30, lowerDeckSeats: 15, upperDeckSeats: 15, sleeperSeats: 30, seaterSeats: 0, isAC: true, isSleeper: true, isSeater: false, amenities: ["WiFi", "Charging Point", "Blanket", "Water Bottle", "Reading Light", "GPS Tracking", "CCTV"], isGPSAvailable: true, isLiveTrackingEnabled: true, baseFare: 900 },
-    { vendorIndex: 2, busName: "Orange Non-AC Seater", busNumber: "AP01ORG002", registrationNumber: "AP01EF9013", busType: "NON_AC_SEATER", seatLayoutType: "2+2_SEATER", totalSeats: 48, lowerDeckSeats: 48, upperDeckSeats: 0, sleeperSeats: 0, seaterSeats: 48, isAC: false, isSleeper: false, isSeater: true, amenities: ["Emergency Exit"], isGPSAvailable: false, isLiveTrackingEnabled: false, baseFare: 300 },
+    { vendorIndex: 0, busName: "A1 AC Sleeper", busNumber: "TN01A1001", registrationNumber: "TN01AB1111", busType: "AC_SLEEPER", seatLayoutType: "2+1_SLEEPER", totalSeats: 36, lowerDeckSeats: 18, upperDeckSeats: 18, sleeperSeats: 36, seaterSeats: 0, isAC: true, isSleeper: true, isSeater: false, amenities: ["WiFi", "Charging Point", "Blanket", "Water Bottle"], isGPSAvailable: true, isLiveTrackingEnabled: true, baseFare: 900 },
+    { vendorIndex: 1, busName: "Krish Deluxe Seater", busNumber: "TN02K002", registrationNumber: "TN02CD2222", busType: "AC_SEATER", seatLayoutType: "2+2_SEATER", totalSeats: 44, lowerDeckSeats: 44, upperDeckSeats: 0, sleeperSeats: 0, seaterSeats: 44, isAC: true, isSleeper: false, isSeater: true, amenities: ["Charging Point", "Water Bottle", "GPS Tracking"], isGPSAvailable: true, isLiveTrackingEnabled: false, baseFare: 500 },
+    { vendorIndex: 2, busName: "Rathimeena Luxury", busNumber: "TN03R003", registrationNumber: "TN03EF3333", busType: "LUXURY_SLEEPER", seatLayoutType: "1+1_SLEEPER", totalSeats: 24, lowerDeckSeats: 12, upperDeckSeats: 12, sleeperSeats: 24, seaterSeats: 0, isAC: true, isSleeper: true, isSeater: false, amenities: ["WiFi", "Charging Point", "Blanket", "Reading Light", "CCTV"], isGPSAvailable: true, isLiveTrackingEnabled: true, baseFare: 1100 },
+    { vendorIndex: 3, busName: "SRM Semi-Sleeper", busNumber: "TN04S004", registrationNumber: "TN04GH4444", busType: "SEMI_SLEEPER", seatLayoutType: "2+1_SEATER", totalSeats: 36, lowerDeckSeats: 36, upperDeckSeats: 0, sleeperSeats: 0, seaterSeats: 36, isAC: true, isSleeper: false, isSeater: true, amenities: ["Charging Point", "Water Bottle"], isGPSAvailable: false, isLiveTrackingEnabled: false, baseFare: 600 },
+    { vendorIndex: 4, busName: "YBM Volvo 9600", busNumber: "TN05Y005", registrationNumber: "TN05IJ5555", busType: "VOLVO_AC", seatLayoutType: "2+1_SLEEPER", totalSeats: 30, lowerDeckSeats: 15, upperDeckSeats: 15, sleeperSeats: 30, seaterSeats: 0, isAC: true, isSleeper: true, isSeater: false, amenities: ["WiFi", "Charging Point", "Blanket", "Water Bottle", "GPS Tracking"], isGPSAvailable: true, isLiveTrackingEnabled: true, baseFare: 1000 },
+];
+
+const chennaiCoimbatoreStops = [
+    { city: "Chennai", state: "Tamil Nadu", arrivalTime: "00:00", departureTime: "00:00", distanceFromSource: 0, order: 1 },
+    { city: "Salem", state: "Tamil Nadu", arrivalTime: "05:00", departureTime: "05:10", distanceFromSource: 340, order: 2 },
+    { city: "Erode", state: "Tamil Nadu", arrivalTime: "06:30", departureTime: "06:40", distanceFromSource: 400, order: 3 },
+    { city: "Tiruppur", state: "Tamil Nadu", arrivalTime: "07:30", departureTime: "07:40", distanceFromSource: 450, order: 4 },
+    { city: "Coimbatore", state: "Tamil Nadu", arrivalTime: "09:00", departureTime: "09:00", distanceFromSource: 510, order: 5 }
+];
+
+const chennaiKanyakumariStops = [
+    { city: "Chennai", state: "Tamil Nadu", arrivalTime: "00:00", departureTime: "00:00", distanceFromSource: 0, order: 1 },
+    { city: "Villupuram", state: "Tamil Nadu", arrivalTime: "02:30", departureTime: "02:40", distanceFromSource: 150, order: 2 },
+    { city: "Trichy", state: "Tamil Nadu", arrivalTime: "05:00", departureTime: "05:15", distanceFromSource: 330, order: 3 },
+    { city: "Madurai", state: "Tamil Nadu", arrivalTime: "07:30", departureTime: "07:45", distanceFromSource: 460, order: 4 },
+    { city: "Kanyakumari", state: "Tamil Nadu", arrivalTime: "12:00", departureTime: "12:00", distanceFromSource: 700, order: 5 }
+];
+
+const chennaiTrichyStops = [
+    { city: "Chennai", state: "Tamil Nadu", arrivalTime: "00:00", departureTime: "00:00", distanceFromSource: 0, order: 1 },
+    { city: "Villupuram", state: "Tamil Nadu", arrivalTime: "02:30", departureTime: "02:40", distanceFromSource: 150, order: 2 },
+    { city: "Trichy", state: "Tamil Nadu", arrivalTime: "06:00", departureTime: "06:00", distanceFromSource: 330, order: 3 }
+];
+
+const coimbatoreKanyakumariStops = [
+    { city: "Coimbatore", state: "Tamil Nadu", arrivalTime: "00:00", departureTime: "00:00", distanceFromSource: 0, order: 1 },
+    { city: "Dharapuram", state: "Tamil Nadu", arrivalTime: "01:30", departureTime: "01:40", distanceFromSource: 80, order: 2 },
+    { city: "Madurai", state: "Tamil Nadu", arrivalTime: "04:30", departureTime: "04:45", distanceFromSource: 220, order: 3 },
+    { city: "Tirunelveli", state: "Tamil Nadu", arrivalTime: "07:00", departureTime: "07:15", distanceFromSource: 370, order: 4 },
+    { city: "Kanyakumari", state: "Tamil Nadu", arrivalTime: "08:30", departureTime: "08:30", distanceFromSource: 450, order: 5 }
 ];
 
 const routeConfigs = [
-    {
-        busConfigIndex: 0,
-        source: { city: "Chennai", state: "Tamil Nadu" },
-        destination: { city: "Coimbatore", state: "Tamil Nadu" },
-        distanceInKm: 510,
-        farePerKm: 2.0,
-        estimatedDurationInMinutes: 540,
-        stops: [
-            { city: "Chennai", state: "Tamil Nadu", arrivalTime: "21:30", departureTime: "21:30", distanceFromSource: 0, order: 1 },
-            { city: "Salem", state: "Tamil Nadu", arrivalTime: "02:30", departureTime: "02:40", distanceFromSource: 340, order: 2 },
-            { city: "Erode", state: "Tamil Nadu", arrivalTime: "04:00", departureTime: "04:10", distanceFromSource: 400, order: 3 },
-            { city: "Tiruppur", state: "Tamil Nadu", arrivalTime: "05:00", departureTime: "05:10", distanceFromSource: 450, order: 4 },
-            { city: "Coimbatore", state: "Tamil Nadu", arrivalTime: "06:30", departureTime: "06:30", distanceFromSource: 510, order: 5 },
-        ],
-    },
-    {
-        busConfigIndex: 1, 
-        source: { city: "Madurai", state: "Tamil Nadu" },
-        destination: { city: "Coimbatore", state: "Tamil Nadu" },
-        distanceInKm: 215,
-        farePerKm: 1.5,
-        estimatedDurationInMinutes: 240, 
-        stops: [
-            { city: "Madurai", state: "Tamil Nadu", arrivalTime: "07:00", departureTime: "07:00", distanceFromSource: 0, order: 1 },
-            { city: "Dharapuram", state: "Tamil Nadu", arrivalTime: "09:00", departureTime: "09:10", distanceFromSource: 120, order: 2 },
-            { city: "Palladam", state: "Tamil Nadu", arrivalTime: "10:15", departureTime: "10:20", distanceFromSource: 180, order: 3 },
-            { city: "Coimbatore", state: "Tamil Nadu", arrivalTime: "11:00", departureTime: "11:00", distanceFromSource: 215, order: 4 },
-        ],
-    },
-    {
-        busConfigIndex: 0,
-        source: { city: "Chennai", state: "Tamil Nadu" },
-        destination: { city: "Bangalore", state: "Karnataka" },
-        distanceInKm: 350,
-        farePerKm: 2.5,
-        estimatedDurationInMinutes: 390,
-        stops: [
-            { city: "Chennai", state: "Tamil Nadu", arrivalTime: "22:00", departureTime: "22:00", distanceFromSource: 0, order: 1 },
-            { city: "Vellore", state: "Tamil Nadu", arrivalTime: "00:30", departureTime: "00:40", distanceFromSource: 130, order: 2 },
-            { city: "Krishnagiri", state: "Tamil Nadu", arrivalTime: "02:00", departureTime: "02:10", distanceFromSource: 220, order: 3 },
-            { city: "Bangalore", state: "Karnataka", arrivalTime: "04:30", departureTime: "04:30", distanceFromSource: 350, order: 4 },
-        ],
-    },
-    {
-        busConfigIndex: 5,
-        source: { city: "Chennai", state: "Tamil Nadu" },
-        destination: { city: "Madurai", state: "Tamil Nadu" },
-        distanceInKm: 460,
-        farePerKm: 0.9,
-        estimatedDurationInMinutes: 510,
-        stops: [
-            { city: "Chennai", state: "Tamil Nadu", arrivalTime: "20:00", departureTime: "20:00", distanceFromSource: 0, order: 1 },
-            { city: "Villupuram", state: "Tamil Nadu", arrivalTime: "22:30", departureTime: "22:40", distanceFromSource: 150, order: 2 },
-            { city: "Trichy", state: "Tamil Nadu", arrivalTime: "01:30", departureTime: "01:45", distanceFromSource: 320, order: 3 },
-            { city: "Dindigul", state: "Tamil Nadu", arrivalTime: "03:15", departureTime: "03:25", distanceFromSource: 400, order: 4 },
-            { city: "Madurai", state: "Tamil Nadu", arrivalTime: "04:30", departureTime: "04:30", distanceFromSource: 460, order: 5 },
-        ],
-    },
-    {
-        busConfigIndex: 2,
-        source: { city: "Bangalore", state: "Karnataka" },
-        destination: { city: "Hyderabad", state: "Telangana" },
-        distanceInKm: 570,
-        farePerKm: 2.2,
-        estimatedDurationInMinutes: 540,
-        stops: [
-            { city: "Bangalore", state: "Karnataka", arrivalTime: "20:00", departureTime: "20:00", distanceFromSource: 0, order: 1 },
-            { city: "Anantapur", state: "Andhra Pradesh", arrivalTime: "23:30", departureTime: "23:45", distanceFromSource: 210, order: 2 },
-            { city: "Kurnool", state: "Andhra Pradesh", arrivalTime: "01:30", departureTime: "01:45", distanceFromSource: 350, order: 3 },
-            { city: "Mahbubnagar", state: "Telangana", arrivalTime: "03:30", departureTime: "03:40", distanceFromSource: 460, order: 4 },
-            { city: "Hyderabad", state: "Telangana", arrivalTime: "05:00", departureTime: "05:00", distanceFromSource: 570, order: 5 },
-        ],
-    },
-    {
-        busConfigIndex: 4,
-        source: { city: "Hyderabad", state: "Telangana" },
-        destination: { city: "Chennai", state: "Tamil Nadu" },
-        distanceInKm: 630,
-        farePerKm: 1.8,
-        estimatedDurationInMinutes: 600,
-        stops: [
-            { city: "Hyderabad", state: "Telangana", arrivalTime: "19:00", departureTime: "19:00", distanceFromSource: 0, order: 1 },
-            { city: "Vijayawada", state: "Andhra Pradesh", arrivalTime: "23:00", departureTime: "23:15", distanceFromSource: 270, order: 2 },
-            { city: "Ongole", state: "Andhra Pradesh", arrivalTime: "01:30", departureTime: "01:40", distanceFromSource: 400, order: 3 },
-            { city: "Nellore", state: "Andhra Pradesh", arrivalTime: "03:00", departureTime: "03:10", distanceFromSource: 490, order: 4 },
-            { city: "Chennai", state: "Tamil Nadu", arrivalTime: "05:00", departureTime: "05:00", distanceFromSource: 630, order: 5 },
-        ],
-    }
+    // Chennai to Coimbatore (21 schedules)
+    { busConfigIndex: 0, source: { city: "Chennai", state: "Tamil Nadu" }, destination: { city: "Coimbatore", state: "Tamil Nadu" }, distanceInKm: 510, farePerKm: 2.0, estimatedDurationInMinutes: 540, stops: chennaiCoimbatoreStops, departureTimes: ["06:00", "10:00", "18:00", "21:00", "22:30"] },
+    { busConfigIndex: 1, source: { city: "Chennai", state: "Tamil Nadu" }, destination: { city: "Coimbatore", state: "Tamil Nadu" }, distanceInKm: 510, farePerKm: 1.5, estimatedDurationInMinutes: 540, stops: chennaiCoimbatoreStops, departureTimes: ["07:00", "11:00", "19:00", "21:30", "23:00"] },
+    { busConfigIndex: 2, source: { city: "Chennai", state: "Tamil Nadu" }, destination: { city: "Coimbatore", state: "Tamil Nadu" }, distanceInKm: 510, farePerKm: 2.5, estimatedDurationInMinutes: 540, stops: chennaiCoimbatoreStops, departureTimes: ["08:00", "12:00", "20:00", "22:00"] },
+    { busConfigIndex: 3, source: { city: "Chennai", state: "Tamil Nadu" }, destination: { city: "Coimbatore", state: "Tamil Nadu" }, distanceInKm: 510, farePerKm: 1.8, estimatedDurationInMinutes: 540, stops: chennaiCoimbatoreStops, departureTimes: ["09:00", "13:00", "20:30", "23:30"] },
+    { busConfigIndex: 4, source: { city: "Chennai", state: "Tamil Nadu" }, destination: { city: "Coimbatore", state: "Tamil Nadu" }, distanceInKm: 510, farePerKm: 2.2, estimatedDurationInMinutes: 540, stops: chennaiCoimbatoreStops, departureTimes: ["14:00", "16:00", "19:30", "22:45"] },
+
+    // Chennai to Kanyakumari (20 schedules)
+    { busConfigIndex: 0, source: { city: "Chennai", state: "Tamil Nadu" }, destination: { city: "Kanyakumari", state: "Tamil Nadu" }, distanceInKm: 700, farePerKm: 2.0, estimatedDurationInMinutes: 720, stops: chennaiKanyakumariStops, departureTimes: ["16:00", "18:00", "20:00", "22:00"] },
+    { busConfigIndex: 1, source: { city: "Chennai", state: "Tamil Nadu" }, destination: { city: "Kanyakumari", state: "Tamil Nadu" }, distanceInKm: 700, farePerKm: 1.5, estimatedDurationInMinutes: 720, stops: chennaiKanyakumariStops, departureTimes: ["17:00", "19:00", "21:00", "22:30"] },
+    { busConfigIndex: 2, source: { city: "Chennai", state: "Tamil Nadu" }, destination: { city: "Kanyakumari", state: "Tamil Nadu" }, distanceInKm: 700, farePerKm: 2.5, estimatedDurationInMinutes: 720, stops: chennaiKanyakumariStops, departureTimes: ["15:30", "18:30", "20:30", "21:30"] },
+    { busConfigIndex: 3, source: { city: "Chennai", state: "Tamil Nadu" }, destination: { city: "Kanyakumari", state: "Tamil Nadu" }, distanceInKm: 700, farePerKm: 1.8, estimatedDurationInMinutes: 720, stops: chennaiKanyakumariStops, departureTimes: ["16:30", "19:30", "21:15", "23:00"] },
+    { busConfigIndex: 4, source: { city: "Chennai", state: "Tamil Nadu" }, destination: { city: "Kanyakumari", state: "Tamil Nadu" }, distanceInKm: 700, farePerKm: 2.2, estimatedDurationInMinutes: 720, stops: chennaiKanyakumariStops, departureTimes: ["17:30", "18:45", "20:45", "22:45"] },
+
+    // Chennai to Trichy (22 schedules)
+    { busConfigIndex: 0, source: { city: "Chennai", state: "Tamil Nadu" }, destination: { city: "Trichy", state: "Tamil Nadu" }, distanceInKm: 330, farePerKm: 2.0, estimatedDurationInMinutes: 360, stops: chennaiTrichyStops, departureTimes: ["05:00", "09:00", "13:00", "17:00", "21:00"] },
+    { busConfigIndex: 1, source: { city: "Chennai", state: "Tamil Nadu" }, destination: { city: "Trichy", state: "Tamil Nadu" }, distanceInKm: 330, farePerKm: 1.5, estimatedDurationInMinutes: 360, stops: chennaiTrichyStops, departureTimes: ["06:00", "10:00", "14:00", "18:00", "22:00"] },
+    { busConfigIndex: 2, source: { city: "Chennai", state: "Tamil Nadu" }, destination: { city: "Trichy", state: "Tamil Nadu" }, distanceInKm: 330, farePerKm: 2.5, estimatedDurationInMinutes: 360, stops: chennaiTrichyStops, departureTimes: ["07:00", "11:00", "15:00", "19:00", "23:00"] },
+    { busConfigIndex: 3, source: { city: "Chennai", state: "Tamil Nadu" }, destination: { city: "Trichy", state: "Tamil Nadu" }, distanceInKm: 330, farePerKm: 1.8, estimatedDurationInMinutes: 360, stops: chennaiTrichyStops, departureTimes: ["08:00", "12:00", "16:00", "20:00"] },
+    { busConfigIndex: 4, source: { city: "Chennai", state: "Tamil Nadu" }, destination: { city: "Trichy", state: "Tamil Nadu" }, distanceInKm: 330, farePerKm: 2.2, estimatedDurationInMinutes: 360, stops: chennaiTrichyStops, departureTimes: ["06:30", "10:30", "14:30", "18:30"] },
+
+    // Coimbatore to Kanyakumari (19 schedules)
+    { busConfigIndex: 0, source: { city: "Coimbatore", state: "Tamil Nadu" }, destination: { city: "Kanyakumari", state: "Tamil Nadu" }, distanceInKm: 450, farePerKm: 2.0, estimatedDurationInMinutes: 510, stops: coimbatoreKanyakumariStops, departureTimes: ["18:00", "20:00", "22:00", "23:00"] },
+    { busConfigIndex: 1, source: { city: "Coimbatore", state: "Tamil Nadu" }, destination: { city: "Kanyakumari", state: "Tamil Nadu" }, distanceInKm: 450, farePerKm: 1.5, estimatedDurationInMinutes: 510, stops: coimbatoreKanyakumariStops, departureTimes: ["19:00", "21:00", "22:30"] },
+    { busConfigIndex: 2, source: { city: "Coimbatore", state: "Tamil Nadu" }, destination: { city: "Kanyakumari", state: "Tamil Nadu" }, distanceInKm: 450, farePerKm: 2.5, estimatedDurationInMinutes: 510, stops: coimbatoreKanyakumariStops, departureTimes: ["17:30", "19:30", "21:30", "23:15"] },
+    { busConfigIndex: 3, source: { city: "Coimbatore", state: "Tamil Nadu" }, destination: { city: "Kanyakumari", state: "Tamil Nadu" }, distanceInKm: 450, farePerKm: 1.8, estimatedDurationInMinutes: 510, stops: coimbatoreKanyakumariStops, departureTimes: ["18:30", "20:30", "22:15", "23:45"] },
+    { busConfigIndex: 4, source: { city: "Coimbatore", state: "Tamil Nadu" }, destination: { city: "Kanyakumari", state: "Tamil Nadu" }, distanceInKm: 450, farePerKm: 2.2, estimatedDurationInMinutes: 510, stops: coimbatoreKanyakumariStops, departureTimes: ["19:15", "20:45", "21:45", "22:45"] },
 ];
 
 const cityPoints = {
@@ -243,14 +213,38 @@ const cityPoints = {
         { name: "Ameerpet", landmark: "Big Bazaar" },
         { name: "Kukatpally", landmark: "Metro Station" },
         { name: "Gachibowli", landmark: "Outer Ring Road" }
+    ],
+    "Kanyakumari": [
+        { name: "Kanyakumari Bus Stand", landmark: "Town Center" },
+        { name: "Kovalam Junction", landmark: "Near Beach" }
+    ],
+    "Sivagangai": [
+        { name: "Sivagangai Bus Stand", landmark: "Main Bus Stand" },
+        { name: "Anna Salai Stop", landmark: "Town Center" }
+    ],
+    "Villupuram": [
+        { name: "Villupuram Bus Stand", landmark: "Junction" }
+    ],
+    "Dindigul": [
+        { name: "Dindigul Bus Stand", landmark: "Central Dindigul" }
+    ],
+    "Tiruppur": [
+        { name: "Tiruppur Old Bus Stand", landmark: "City Center" }
+    ],
+    "Dharapuram": [
+        { name: "Dharapuram Bus Stand", landmark: "Main Stand" }
+    ],
+    "Tirunelveli": [
+        { name: "Tirunelveli New Bus Stand", landmark: "Vannarpettai" },
+        { name: "Junction", landmark: "Railway Station" }
     ]
 };
 
-function getNextDates(count) {
+function getDateRange() {
     const dates = [];
-    const today = new Date();
-    for (let i = 1; i <= count; i++) {
-        const d = new Date(today);
+    const start = new Date("2026-06-29");
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(start);
         d.setDate(d.getDate() + i);
         dates.push(d.toISOString().split("T")[0]);
     }
@@ -270,7 +264,7 @@ async function seed() {
         await Schedule.deleteMany({});
         await Route.deleteMany({});
         await Bus.deleteMany({});
-        await User.deleteMany({ email: { $in: vendorUsers.map((v) => v.email) } });
+        await User.deleteMany({ role: "vendor" });
 
         console.log("👤 Creating vendor users...");
         const createdVendors = [];
@@ -309,15 +303,15 @@ async function seed() {
                 stops: config.stops, distanceInKm: config.distanceInKm,
                 farePerKm: config.farePerKm, estimatedDurationInMinutes: config.estimatedDurationInMinutes,
             });
-            createdRoutes.push({ route, busIndex: config.busConfigIndex });
+            createdRoutes.push({ route, busIndex: config.busConfigIndex, departureTimes: config.departureTimes });
             console.log(`   ✅ ${config.stops.map(s => s.city).join(" → ")} (${config.distanceInKm} km)`);
         }
 
         console.log("\n📅 Creating schedules...");
-        const dates = getNextDates(5);
+        const dates = getDateRange();
         let scheduleCount = 0;
 
-        for (const { route, busIndex } of createdRoutes) {
+        for (const { route, busIndex, departureTimes } of createdRoutes) {
             const bus = createdBuses[busIndex];
             const vendor = createdVendors[busConfigs[busIndex].vendorIndex];
             const baseFare = busConfigs[busIndex].baseFare;
@@ -361,40 +355,50 @@ async function seed() {
                 });
             }
 
-            for (const date of dates) {
-                const departureDateObj = new Date(date);
-                const depTimeStr = route.stops[0].departureTime;
-                
-                // Calculate arrivalDate
-                const [depHr, depMin] = depTimeStr.split(":").map(Number);
-                const totalDepMins = depHr * 60 + depMin;
-                const totalArrMins = totalDepMins + route.estimatedDurationInMinutes;
-                
-                const arrivalDateObj = new Date(departureDateObj);
-                const daysAdded = Math.floor(totalArrMins / 1440);
-                arrivalDateObj.setDate(arrivalDateObj.getDate() + daysAdded);
+            const timeSlots = (departureTimes && departureTimes.length > 0)
+                ? departureTimes
+                : [route.stops[0].departureTime];
 
-                await Schedule.create({
-                    routeId: route._id,
-                    busId: bus._id,
-                    operatorId: vendor._id,
-                    departureDate: departureDateObj,
-                    arrivalDate: arrivalDateObj,
-                    departureTime: depTimeStr,
-                    arrivalTime: route.stops[route.stops.length - 1].arrivalTime,
-                    baseFare,
-                    availableSeats: seats.length,
-                    seats,
-                    boardingPoints,
-                    droppingPoints,
-                    cancellationPolicy: [
-                        { hoursBeforeDeparture: 24, refundPercentage: 75 },
-                        { hoursBeforeDeparture: 12, refundPercentage: 50 },
-                        { hoursBeforeDeparture: 6, refundPercentage: 25 },
-                        { hoursBeforeDeparture: 0, refundPercentage: 0 },
-                    ],
-                });
-                scheduleCount++;
+            for (const date of dates) {
+                for (const depTimeStr of timeSlots) {
+                    const departureDateObj = new Date(date);
+
+                    // Calculate arrivalDate and arrivalTime from departure + duration
+                    const [depHr, depMin] = depTimeStr.split(":").map(Number);
+                    const totalDepMins = depHr * 60 + depMin;
+                    const totalArrMins = totalDepMins + route.estimatedDurationInMinutes;
+
+                    const arrivalDateObj = new Date(departureDateObj);
+                    const daysAdded = Math.floor(totalArrMins / 1440);
+                    arrivalDateObj.setDate(arrivalDateObj.getDate() + daysAdded);
+
+                    const arrMinsInDay = totalArrMins % 1440;
+                    const arrHr = Math.floor(arrMinsInDay / 60).toString().padStart(2, "0");
+                    const arrMin = (arrMinsInDay % 60).toString().padStart(2, "0");
+                    const arrivalTimeStr = `${arrHr}:${arrMin}`;
+
+                    await Schedule.create({
+                        routeId: route._id,
+                        busId: bus._id,
+                        operatorId: vendor._id,
+                        departureDate: departureDateObj,
+                        arrivalDate: arrivalDateObj,
+                        departureTime: depTimeStr,
+                        arrivalTime: arrivalTimeStr,
+                        baseFare,
+                        availableSeats: seats.length,
+                        seats,
+                        boardingPoints,
+                        droppingPoints,
+                        cancellationPolicy: [
+                            { hoursBeforeDeparture: 24, refundPercentage: 75 },
+                            { hoursBeforeDeparture: 12, refundPercentage: 50 },
+                            { hoursBeforeDeparture: 6, refundPercentage: 25 },
+                            { hoursBeforeDeparture: 0, refundPercentage: 0 },
+                        ],
+                    });
+                    scheduleCount++;
+                }
             }
         }
         console.log(`   ✅ Created ${scheduleCount} schedules across ${dates.length} days`);

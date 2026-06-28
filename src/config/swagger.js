@@ -425,8 +425,10 @@ const options = {
 
                 BoardingDroppingPoint: {
                     type: "object",
-                    required: ["name", "time"],
+                    required: ["id", "city", "name", "time"],
                     properties: {
+                        id: { type: "string", example: "682abc1234567890abcd5678" },
+                        city: { type: "string", example: "Chennai" },
                         name: { type: "string", example: "Koyambedu Bus Stand" },
                         address: { type: "string", example: "Koyambedu, Chennai" },
                         time: { type: "string", example: "22:00", description: "HH:mm format" },
@@ -530,17 +532,58 @@ const options = {
                             items: {
                                 type: "object",
                                 properties: {
-                                    _id: { type: "string" },
-                                    routeId: { type: "object" },
-                                    busId: { type: "object" },
-                                    departureDate: { type: "string", format: "date" },
-                                    departureTime: { type: "string", example: "22:00" },
-                                    arrivalTime: { type: "string", example: "04:30" },
-                                    baseFare: { type: "number", example: 875 },
-                                    availableSeats: { type: "integer", example: 28 },
-                                    boardingStop: { $ref: "#/components/schemas/StopItem" },
-                                    droppingStop: { $ref: "#/components/schemas/StopItem" },
-                                    calculatedFare: { type: "number", example: 550, description: "Proportional fare for the segment (farePerKm × segment distance)" },
+                                    scheduleId: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0d" },
+                                    operator: {
+                                        type: "object",
+                                        properties: {
+                                            id: { type: "string", example: "682abc1234567890abcd1234" },
+                                            name: { type: "string", example: "KPN Travels" }
+                                        }
+                                    },
+                                    bus: {
+                                        type: "object",
+                                        properties: {
+                                            id: { type: "string", example: "682abc1234567890abcd1234" },
+                                            name: { type: "string", example: "KPN Volvo Multi-Axle" },
+                                            number: { type: "string", example: "TN01KPN001" },
+                                            type: { type: "string", example: "AC_SLEEPER" },
+                                            layout: { type: "string", example: "2+1_SLEEPER" },
+                                            isAC: { type: "boolean", example: true },
+                                            isSleeper: { type: "boolean", example: true },
+                                            isSeater: { type: "boolean", example: false },
+                                            amenities: { type: "array", items: { type: "string" }, example: ["WiFi", "Water Bottle"] },
+                                            rating: { type: "number", example: 4.5 }
+                                        }
+                                    },
+                                    journey: {
+                                        type: "object",
+                                        properties: {
+                                            departureDate: { type: "string", format: "date-time" },
+                                            arrivalDate: { type: "string", format: "date-time" },
+                                            departureTime: { type: "string", example: "22:00" },
+                                            arrivalTime: { type: "string", example: "04:30" },
+                                            durationMinutes: { type: "integer", example: 390 },
+                                            source: { type: "string", example: "Chennai" },
+                                            destination: { type: "string", example: "Coimbatore" }
+                                        }
+                                    },
+                                    pricing: {
+                                        type: "object",
+                                        properties: {
+                                            baseFare: { type: "number", example: 500 },
+                                            calculatedFare: { type: "number", example: 765, description: "Proportional fare for the segment" }
+                                        }
+                                    },
+                                    seats: {
+                                        type: "object",
+                                        properties: {
+                                            available: { type: "integer", example: 28 },
+                                            total: { type: "integer", example: 36 }
+                                        }
+                                    },
+                                    boardingPoints: { type: "array", items: { $ref: "#/components/schemas/BoardingDroppingPoint" } },
+                                    droppingPoints: { type: "array", items: { $ref: "#/components/schemas/BoardingDroppingPoint" } },
+                                    cancellationPolicy: { type: "array", items: { $ref: "#/components/schemas/CancellationTier" } },
                                     status: { type: "string", example: "SCHEDULED" },
                                 },
                             },

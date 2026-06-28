@@ -14,7 +14,7 @@ import { ApiError } from "../../../utils/ApiError.js";
 const cookieOptions = (ms) => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "none",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   maxAge: ms
 });
 
@@ -102,7 +102,7 @@ export const refresh = async (req, res, next) => {
 export const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
-    
+
     if (!email) {
       return res.status(400).json({ success: false, message: "Email is required" });
     }
@@ -146,7 +146,7 @@ export const resetPasswordController = async (req, res, next) => {
 export const sendMobileOTPController = async (req, res, next) => {
   try {
     const { mobile } = req.body;
-    
+
     if (!mobile) {
       return res.status(400).json({ success: false, message: "Mobile number is required" });
     }
