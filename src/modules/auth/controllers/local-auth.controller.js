@@ -14,8 +14,10 @@ import { ApiError } from "../../../utils/ApiError.js";
 const cookieOptions = (ms) => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
+  // Browsers require SameSite=None cookies to be Secure. Use 'lax' during
+  // local development so cookies are accepted over http://localhost.
   sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-  maxAge: ms
+  maxAge: ms,
 });
 
 
@@ -86,12 +88,9 @@ export const refresh = async (req, res, next) => {
 
     const accessToken = generateAccessToken(user);
 
-    res.cookie("accessToken", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 15 * 60 * 1000,
-    });
+    // Use the same cookieOptions helper so SameSite/secure behavior is consistent
+    // between environments.
+    res.cookie("accessToken", accessToken, cookieOptions(15 * 60 * 1000));
 
     return res.status(200).json({ success: true, message: "Access token refreshed successfully" });
   } catch (error) {
@@ -219,12 +218,12 @@ export const logout = async (req, res, next) => {
     res.clearCookie("accessToken", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "none"
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
     });
     res.clearCookie("refreshToken", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "none"
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
     });
 
     return res.status(200).json({
