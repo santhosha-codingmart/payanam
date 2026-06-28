@@ -184,3 +184,48 @@ export const searchBuses = async (req, res, next) => {
         next(error);
     }
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SEAT BLOCKING (Phase 1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const blockSeats = async (req, res, next) => {
+    try {
+        const { scheduleId } = req.params;
+        const { seatNumbers } = req.body;
+        // User must be logged in, so req.user exists
+        const userId = req.user._id;
+
+        const result = await busService.blockSeatsService(userId, scheduleId, seatNumbers);
+
+        return res.status(200).json({
+            success: true,
+            message: result.message,
+            expiresAt: result.expiresAt
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REVIEWS (Phase 5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const addReview = async (req, res, next) => {
+    try {
+        const { busId } = req.params;
+        const { bookingId, rating, review } = req.body;
+        const userId = req.user._id;
+
+        const result = await busService.addReviewService(userId, busId, bookingId, rating, review);
+
+        return res.status(201).json({
+            success: true,
+            message: "Review added successfully.",
+            data: result
+        });
+    } catch (error) {
+        next(error);
+    }
+};

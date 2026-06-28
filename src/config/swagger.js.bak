@@ -590,7 +590,7 @@ const options = {
                         },
                     },
                 },
-                // SearchResultResponse closes here ^^^
+            },
 
                 // ── Bookings ─────────────────────────────────────────────────
 
@@ -616,7 +616,7 @@ const options = {
                         droppingPointId: { type: "string", example: "665f1a2b3c4d5e6f7a8b0002" },
                         passengerDetails: {
                             type: "array",
-                            items: { $ref: "#/components/schemas/PassengerDetail" },
+                            items: { "$ref": "#/components/schemas/PassengerDetail" },
                         },
                     },
                 },
@@ -665,8 +665,8 @@ const options = {
                         },
                     },
                 },
+            },
 
-            }, // ← closes schemas
 
             // ── Cookie-based JWT auth (accessToken) ────────────────────────
             securitySchemes: {

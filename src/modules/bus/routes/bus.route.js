@@ -10,6 +10,8 @@ import {
     createSchedule,
     getScheduleSeats,
     searchBuses,
+    blockSeats,
+    addReview,
 } from "../controllers/bus.controller.js";
 import { authenticate } from "../../../middleware/auth.middleware.js";
 import { authorize } from "../../../middleware/role.middleware.js";
@@ -22,6 +24,8 @@ import {
     createScheduleSchema,
     scheduleIdParamSchema,
     searchBusSchema,
+    blockSeatsSchema,
+    createReviewSchema,
 } from "../validators/bus.validator.js";
 
 const router = express.Router();
@@ -533,6 +537,96 @@ router.post(
     authorize("vendor", "admin"),
     validate(createScheduleSchema),
     createSchedule
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SEAT BLOCKING (Phase 1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/v1/buses/schedules/{scheduleId}/block-seats:
+ *   post:
+ *     summary: Temporarily block seats for booking
+ *     description: Blocks seats in Redis for 10 minutes to prevent double booking.
+ *     tags: [Buses - Seats]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: scheduleId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               seatNumbers:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: Seats blocked successfully
+ *       400:
+ *         description: Invalid seats
+ *       409:
+ *         description: Seats already booked or blocked by another user
+ */
+router.post(
+    "/schedules/:scheduleId/block-seats",
+    authenticate,
+    validate(blockSeatsSchema),
+    blockSeats
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REVIEWS AND RATINGS (Phase 5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/v1/buses/{busId}/reviews:
+ *   post:
+ *     summary: Add a review for a bus
+ *     description: Users can rate and review a bus after their completed journey.
+ *     tags: [Buses - CRUD]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: busId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               bookingId:
+ *                 type: string
+ *               rating:
+ *                 type: number
+ *               review:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Review added successfully
+ *       409:
+ *         description: Duplicate review for this booking
+ */
+router.post(
+    "/:busId/reviews",
+    authenticate,
+    validate(createReviewSchema),
+    addReview
 );
 
 export default router;

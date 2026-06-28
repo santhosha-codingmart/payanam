@@ -195,3 +195,25 @@ export const searchBusSchema = z.object({
         // allowed but just ignored if the controller doesn't use them.
     }),
 });
+
+// ─── Seat Blocking Validator (Phase 1) ───────────────────────────────────────
+export const blockSeatsSchema = z.object({
+    params: z.object({
+        scheduleId: objectId,
+    }),
+    body: z.object({
+        seatNumbers: z.array(z.string()).min(1, "At least one seat must be selected"),
+    }),
+});
+
+// ─── Review Validator (Phase 5) ──────────────────────────────────────────────
+export const createReviewSchema = z.object({
+    params: z.object({
+        busId: objectId,
+    }),
+    body: z.object({
+        bookingId: objectId,
+        rating: z.number().min(1).max(5),
+        review: z.string().min(10, "Review must be at least 10 characters long").max(1000),
+    }),
+});

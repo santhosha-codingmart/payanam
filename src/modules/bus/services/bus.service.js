@@ -9,6 +9,8 @@ import { Bus } from "../models/bus.model.js";
 import { Route } from "../models/route.model.js";
 import { Schedule } from "../models/schedule.model.js";
 import { ApiError } from "../../../utils/ApiError.js";
+import redis from "../../../config/redis.js";
+import { Review } from "../models/review.model.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BUS CRUD (Vendor-only)
@@ -493,4 +495,140 @@ export const searchBusesService = async (from, to, date, filters = {}) => {
     }
 
     return schedules;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SEAT BLOCKING (Phase 1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const blockSeatsService = async (userId, scheduleId, seatNumbers) => {
+    // 1. Fetch the schedule
+    const schedule = await Schedule.findById(scheduleId);
+    if (!schedule) {
+        throw new ApiError(404, "Schedule not found");
+    }
+
+    // 2. Validate all requested seats
+    const validSeats = [];
+    for (const seatNumber of seatNumbers) {
+        const seat = schedule.seats.find((s) => s.seatNumber === seatNumber);
+        
+        if (!seat) {
+            throw new ApiError(400, `Seat ${seatNumber} does not exist on this bus.`);
+        }
+
+        if (seat.status === "BOOKED") {
+            throw new ApiError(409, `Seat ${seatNumber} is already booked.`);
+        }
+
+        // Check if it's already blocked in Redis by someone else
+        const lockKey = `seat_lock:${scheduleId}:${seatNumber}`;
+        const existingLock = await redis.get(lockKey);
+        
+        if (existingLock && existingLock !== userId.toString()) {
+            throw new ApiError(409, `Seat ${seatNumber} is currently being booked by another user. Please try again later.`);
+        }
+        
+        validSeats.push(seatNumber);
+    }
+
+    // 3. Acquire Redis locks (10 minutes TTL)
+    const TTL_SECONDS = 600; // 10 minutes
+    const pipeline = redis.pipeline();
+    
+    for (const seatNumber of validSeats) {
+        const lockKey = `seat_lock:${scheduleId}:${seatNumber}`;
+        pipeline.set(lockKey, userId.toString(), "EX", TTL_SECONDS);
+        
+        // Also update Mongoose document so UI reflects it immediately
+        const seatIndex = schedule.seats.findIndex((s) => s.seatNumber === seatNumber);
+        if (seatIndex !== -1) {
+            schedule.seats[seatIndex].status = "BLOCKED";
+        }
+    }
+    
+    // Execute Redis pipeline
+    await pipeline.exec();
+    
+    // 4. Save schedule changes
+    await schedule.save();
+
+    // 5. Schedule a delayed job to unblock seats if not booked
+    // In production, use BullMQ or AWS SQS. For this scale, a simple setTimeout works.
+    setTimeout(async () => {
+        try {
+            const sched = await Schedule.findById(scheduleId);
+            if (!sched) return;
+            
+            let changed = false;
+            for (const seatNumber of validSeats) {
+                const lockKey = `seat_lock:${scheduleId}:${seatNumber}`;
+                const lockValue = await redis.get(lockKey);
+                
+                // If the lock is missing (expired or deleted by booking)
+                if (!lockValue) {
+                    const seatIndex = sched.seats.findIndex((s) => s.seatNumber === seatNumber);
+                    // Only revert if it's still BLOCKED (not BOOKED by the booking service)
+                    if (seatIndex !== -1 && sched.seats[seatIndex].status === "BLOCKED") {
+                        sched.seats[seatIndex].status = "AVAILABLE";
+                        changed = true;
+                    }
+                }
+            }
+            if (changed) await sched.save();
+        } catch (error) {
+            console.error("Error in seat unblocking job:", error);
+        }
+    }, (TTL_SECONDS + 5) * 1000); // Wait slightly longer than TTL
+
+    const expiresAt = new Date(Date.now() + TTL_SECONDS * 1000);
+    return {
+        message: "Seats blocked successfully for 10 minutes.",
+        expiresAt
+    };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REVIEWS AND RATINGS (Phase 5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const addReviewService = async (userId, busId, bookingId, rating, reviewText) => {
+    // 1. Verify bus exists
+    const bus = await Bus.findById(busId);
+    if (!bus) throw new ApiError(404, "Bus not found");
+
+    // 2. Prevent duplicate reviews for the same booking
+    const existingReview = await Review.findOne({ bookingId });
+    if (existingReview) {
+        throw new ApiError(409, "You have already reviewed this trip.");
+    }
+
+    // 3. Create review
+    const review = await Review.create({
+        userId,
+        busId,
+        bookingId,
+        rating,
+        review: reviewText
+    });
+
+    // 4. Update average rating on the Bus using aggregation
+    const stats = await Review.aggregate([
+        { $match: { busId: bus._id } },
+        { 
+            $group: { 
+                _id: "$busId", 
+                avgRating: { $avg: "$rating" },
+                totalRatings: { $sum: 1 }
+            }
+        }
+    ]);
+
+    if (stats.length > 0) {
+        bus.averageRating = Math.round(stats[0].avgRating * 10) / 10; // Round to 1 decimal
+        bus.totalRatings = stats[0].totalRatings;
+        await bus.save();
+    }
+
+    return review;
 };

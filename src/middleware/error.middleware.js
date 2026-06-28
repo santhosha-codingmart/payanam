@@ -1,4 +1,7 @@
 export const errorHandler = (err, req, res, next) => {
+    // Log the full stack so we can debug unexpected errors
+    console.error(`[ERROR] ${req.method} ${req.url} →`, err.stack || err.message);
+
     // If our Custom ApiError threw the error, it will have a statusCode. 
     // Otherwise, it’s an unexpected crash, so we default to 500.
     const statusCode = err.statusCode || 500;
