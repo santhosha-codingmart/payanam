@@ -174,7 +174,6 @@ router.get("/search", validate(searchBusSchema), searchBuses);
  */
 router.get(
     "/schedules/:scheduleId/seats",
-    authenticate,
     validate(scheduleIdParamSchema),
     getScheduleSeats
 );
