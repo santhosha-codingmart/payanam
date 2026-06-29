@@ -4,52 +4,72 @@ import { ApiError } from "./ApiError.js";
 
 dotenv.config();
 
-// Best Practice: Build a fresh transporter for every send call.
-// Reusing a module-level transporter causes ECONNECTION errors because
-// Mailtrap (and most SMTP servers) close idle TCP connections silently.
-// Creating a new transporter per call is cheap and avoids stale-socket issues.
+// ─── Gmail SMTP Transporter ──────────────────────────────────────────────────
+// Uses Gmail's real SMTP with an App Password (NOT your Gmail login password).
+// App Passwords are 16-character codes generated at:
+//   https://myaccount.google.com/apppasswords
+//
+// Required .env variables:
+//   GMAIL_USER  → your Gmail address  (e.g. yourname@gmail.com)
+//   GMAIL_PASS  → 16-char App Password (e.g. abcd efgh ijkl mnop)
+// ─────────────────────────────────────────────────────────────────────────────
 const createTransporter = () =>
     nodemailer.createTransport({
-        host: process.env.SMTP_HOST || "sandbox.smtp.mailtrap.io",
-        port: parseInt(process.env.SMTP_PORT, 10) || 2525,
+        service: "gmail",      // Nodemailer knows Gmail's host/port automatically
         auth: {
-            user: process.env.SMTP_USER || "df5f3e7a4a64ef",
-            pass: process.env.SMTP_PASS || "b5c9e77f10f5c0"
+            user: process.env.GMAIL_USER,
+            pass: process.env.GMAIL_PASS, // App Password — NOT your Gmail password
         },
-        // Disable connection pooling – always open a fresh connection
-        pool: false,
-        // Fail fast so the user gets a quick error instead of hanging
-        connectionTimeout: 10_000, // 10 seconds to establish TCP connection
-        greetingTimeout: 10_000,   // 10 seconds to receive SMTP greeting
-        socketTimeout: 15_000,     // 15 seconds of socket inactivity allowed
+        // Fail fast so users get a quick error instead of hanging
+        connectionTimeout: 10_000,
+        greetingTimeout: 10_000,
+        socketTimeout: 15_000,
     });
 
-// A highly reusable function to send an OTP
+// ─── Send OTP Email ───────────────────────────────────────────────────────────
 export const sendOTPEmail = async (toEmail, otpCode) => {
     try {
         const transporter = createTransporter();
 
         const mailOptions = {
-            from: '"Payanam Support" <no-reply@payanam.com>', // Who the email is from
-            to: toEmail,                                       // The user's email address
-            subject: "Your Password Reset Code",               // Subject line
+            from: `"Payanam Support" <${process.env.GMAIL_USER}>`,
+            to: toEmail,
+            subject: "Your Payanam OTP Code",
             html: `
-                <div style="font-family: Arial, sans-serif; padding: 20px; text-align: center;">
-                    <h2>Password Reset Request</h2>
-                    <p>You recently requested to reset your password. Use the code below to proceed.</p>
-                    <h1 style="color: #4CAF50; letter-spacing: 5px; font-size: 40px;">${otpCode}</h1>
-                    <p><strong>This code will expire in exactly 5 minutes.</strong></p>
-                    <p style="color: gray; font-size: 12px;">If you did not request this, you can safely ignore this email.</p>
+                <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #f9f9f9; border-radius: 12px; border: 1px solid #e0e0e0;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <h2 style="color: #1a1a2e; margin: 0; font-size: 24px;">🎟️ Payanam</h2>
+                        <p style="color: #555; margin: 8px 0 0;">Password Reset Request</p>
+                    </div>
+
+                    <p style="color: #333; font-size: 15px; line-height: 1.6;">
+                        You requested to reset your password. Use the OTP below to proceed.
+                    </p>
+
+                    <div style="background: #1a1a2e; border-radius: 10px; padding: 24px; text-align: center; margin: 24px 0;">
+                        <p style="color: #aaa; font-size: 13px; margin: 0 0 8px; letter-spacing: 1px; text-transform: uppercase;">Your One-Time Password</p>
+                        <h1 style="color: #f5c518; letter-spacing: 12px; font-size: 42px; margin: 0; font-weight: 800;">${otpCode}</h1>
+                    </div>
+
+                    <p style="color: #e74c3c; font-size: 13px; text-align: center; font-weight: 600; margin: 0;">
+                        ⏱️ This code expires in <strong>5 minutes</strong>.
+                    </p>
+
+                    <hr style="border: none; border-top: 1px solid #ddd; margin: 24px 0;" />
+
+                    <p style="color: #999; font-size: 12px; text-align: center; margin: 0;">
+                        If you did not request this, you can safely ignore this email.<br/>
+                        Do not share this OTP with anyone — Payanam will never ask for it.
+                    </p>
                 </div>
             `
         };
 
-        // Await the transporter to actually fire the email across the internet
         await transporter.sendMail(mailOptions);
         console.log(`🎟️ OTP Email successfully sent to ${toEmail}`);
 
     } catch (error) {
-        console.error("Nodemailer Error:", error);
-        throw new ApiError(500, "Failed to send OTP email to user.");
+        console.error("Nodemailer Gmail Error:", error);
+        throw new ApiError(500, "Failed to send OTP email. Please try again.");
     }
 };
