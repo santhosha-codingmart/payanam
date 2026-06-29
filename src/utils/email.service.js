@@ -4,15 +4,6 @@ import { ApiError } from "./ApiError.js";
 
 dotenv.config();
 
-// ─── Gmail SMTP Transporter ──────────────────────────────────────────────────
-// Uses Gmail's real SMTP with an App Password (NOT your Gmail login password).
-// App Passwords are 16-character codes generated at:
-//   https://myaccount.google.com/apppasswords
-//
-// Required .env variables:
-//   GMAIL_USER  → your Gmail address  (e.g. yourname@gmail.com)
-//   GMAIL_PASS  → 16-char App Password (e.g. abcd efgh ijkl mnop)
-// ─────────────────────────────────────────────────────────────────────────────
 const createTransporter = () =>
     nodemailer.createTransport({
         service: "gmail",      // Nodemailer knows Gmail's host/port automatically
