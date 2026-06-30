@@ -31,6 +31,44 @@ export const registerByEmail = async (userData) => {
     return createdUser;
 }
 
+// =============================================================================
+// VENDOR REGISTRATION
+// =============================================================================
+//
+// Identical flow to registerByEmail but:
+//   - Accepts extra vendor fields: name, phoneNo, companyName, gstNumber
+//   - Hard-codes role: "vendor" — the client NEVER sends the role
+//     (if they did, it would be ignored here, preventing privilege escalation)
+//
+// =============================================================================
+export const registerVendorByEmail = async (userData) => {
+    const { name, email, password, phoneNo, companyName, gstNumber } = userData;
+
+    // Uniqueness checks
+    if (await User.findOne({ email })) {
+        throw new ApiError(409, "This email is already registered.");
+    }
+
+    if (phoneNo && await User.findOne({ phoneNo })) {
+        throw new ApiError(409, "This phone number is already registered.");
+    }
+
+    const hashedPassword = await bCyrpt.hash(password, 10);
+
+    const vendor = await User.create({
+        name,
+        email,
+        password: hashedPassword,
+        phoneNo:     phoneNo     || undefined,
+        companyName: companyName,
+        gstNumber:   gstNumber   || undefined,
+        role: "vendor",          // ← server assigns this, never the client
+        authProvider: "local",
+    });
+
+    return vendor;
+};
+
 export const loginByEmail = async (userData) => {
     const { email, password } = userData;
     if (!email) {

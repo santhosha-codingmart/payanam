@@ -1,5 +1,6 @@
 import {
   registerByEmail,
+  registerVendorByEmail,
   loginByEmail,
   requestPasswordReset,
   verifyAndResetPassword,
@@ -35,6 +36,37 @@ export const register = async (req, res, next) => {
       success: true,
       message: "User registered successfully",
       user: { id: user._id, email: user.email },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// =============================================================================
+// POST /api/auth/register-vendor
+// Creates a vendor account. Role is set server-side — never accepted from client.
+// =============================================================================
+export const registerVendor = async (req, res, next) => {
+  try {
+    const vendor = await registerVendorByEmail(req.body);
+    const accessToken  = generateAccessToken(vendor);
+    const refreshToken = generateRefreshToken(vendor);
+
+    await RefreshToken.create({ userId: vendor._id, token: refreshToken });
+
+    res.cookie("accessToken",  accessToken,  cookieOptions(15 * 60 * 1000));
+    res.cookie("refreshToken", refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000));
+
+    return res.status(201).json({
+      success: true,
+      message: "Vendor registered successfully. Welcome to Payanam!",
+      user: {
+        id:          vendor._id,
+        name:        vendor.name,
+        email:       vendor.email,
+        role:        vendor.role,         // "vendor" — useful for frontend redirect
+        companyName: vendor.companyName,
+      },
     });
   } catch (error) {
     return next(error);

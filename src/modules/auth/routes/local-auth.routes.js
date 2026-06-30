@@ -4,6 +4,7 @@ import {
     login,
     refresh,
     register,
+    registerVendor,
     forgotPassword,
     resetPasswordController,
     sendMobileOTPController,
@@ -15,6 +16,7 @@ import { validate } from "../../../middleware/validate.middleware.js";
 import {
     loginSchema,
     registerSchema,
+    registerVendorSchema,
     forgotPasswordSchema,
     resetPasswordSchema,
     sendMobileOTPSchema,
@@ -35,6 +37,98 @@ let router = express.Router();
  *   - name: Auth - Mobile OTP
  *     description: Passwordless login & registration via mobile OTP (SMS)
  */
+
+/**
+ * @swagger
+ * /api/auth/register-vendor:
+ *   post:
+ *     summary: Register a new vendor account
+ *     description: >
+ *       Creates a vendor account with `role: "vendor"` automatically assigned
+ *       by the server. The client **never** sends the role field.
+ *
+ *       After registration, the vendor can:
+ *       - Create buses via `POST /api/v1/buses`
+ *       - Define routes via `POST /api/v1/buses/routes`
+ *       - Create schedules via `POST /api/v1/buses/schedules`
+ *     tags: [Auth - Email]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, email, password, companyName, gstNumber]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Parveen Kumar"
+ *                 description: "Full name of the vendor contact person"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "contact@parveentravels.com"
+ *               password:
+ *                 type: string
+ *                 example: "SecurePass@123"
+ *                 description: "Min 8 chars, must have uppercase, lowercase, digit, special char"
+ *               phoneNo:
+ *                 type: string
+ *                 example: "+919876543210"
+ *                 description: "Optional. E.164 format."
+ *               companyName:
+ *                 type: string
+ *                 example: "Parveen Travels Pvt. Ltd."
+ *                 description: "The trading name displayed to passengers"
+ *               gstNumber:
+ *                 type: string
+ *                 example: "33AABCP1234A1ZX"
+ *                 description: "Required. Indian GST registration number for tax invoicing."
+ *           example:
+ *             name: "Parveen Kumar"
+ *             email: "contact@parveentravels.com"
+ *             password: "SecurePass@123"
+ *             phoneNo: "+919876543210"
+ *             companyName: "Parveen Travels Pvt. Ltd."
+ *             gstNumber: "33AABCP1234A1ZX"
+ *     responses:
+ *       201:
+ *         description: Vendor registered. Auth cookies set.
+ *         headers:
+ *           Set-Cookie:
+ *             description: "accessToken=<jwt>; HttpOnly | refreshToken=<jwt>; HttpOnly"
+ *             schema:
+ *               type: string
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *             example:
+ *               success: true
+ *               message: "Vendor registered successfully. Welcome to Payanam!"
+ *               user:
+ *                 id: "665f1a2b3c4d5e6f7a8b9c0d"
+ *                 name: "Parveen Kumar"
+ *                 email: "contact@parveentravels.com"
+ *                 role: "vendor"
+ *                 companyName: "Parveen Travels Pvt. Ltd."
+ *       400:
+ *         description: Validation error (missing required fields, weak password, invalid GST)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: Email or phone number already registered
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "This email is already registered."
+ */
+router.post('/register-vendor', validate(registerVendorSchema), registerVendor);
 
 /**
  * @swagger
