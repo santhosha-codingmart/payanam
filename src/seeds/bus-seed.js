@@ -322,38 +322,19 @@ async function seed() {
                 bookedBy: null, passengerName: null, passengerAge: null, passengerGender: null,
             }));
 
-            const boardingPoints = [];
-            const droppingPoints = [];
-
-            // Add boarding points for all stops EXCEPT the last one
-            for (let i = 0; i < route.stops.length - 1; i++) {
-                const stop = route.stops[i];
-                const points = cityPoints[stop.city] || [{ name: `${stop.city} Bus Stand`, landmark: `Main Stand` }];
-                points.forEach((pt, index) => {
-                    boardingPoints.push({
-                        city: stop.city,
-                        name: pt.name,
-                        address: pt.landmark + ", " + stop.city,
-                        time: stop.departureTime,
-                        landmark: pt.landmark
-                    });
-                });
-            }
-
-            // Add dropping points for all stops EXCEPT the first one
-            for (let i = 1; i < route.stops.length; i++) {
-                const stop = route.stops[i];
-                const points = cityPoints[stop.city] || [{ name: `${stop.city} Bus Stand`, landmark: `Main Stand` }];
-                points.forEach((pt) => {
-                    droppingPoints.push({
-                        city: stop.city,
-                        name: pt.name,
-                        address: pt.landmark + ", " + stop.city,
-                        time: stop.arrivalTime,
-                        landmark: pt.landmark
-                    });
-                });
-            }
+            // ── Helper: compute a real stop time from the actual schedule departure ──
+            // Each stop's time = departure time + proportional share of total duration
+            // based on how far along the route that stop is (distanceFromSource ratio).
+            const computeStopTime = (depTimeStr, stop, totalDistanceKm, totalDurationMins) => {
+                const [depHr, depMin] = depTimeStr.split(":").map(Number);
+                const depTotalMins = depHr * 60 + depMin;
+                const ratio = totalDistanceKm > 0 ? stop.distanceFromSource / totalDistanceKm : 0;
+                const offsetMins = Math.round(ratio * totalDurationMins);
+                const stopTotalMins = (depTotalMins + offsetMins) % 1440; // wrap at midnight
+                const hr = Math.floor(stopTotalMins / 60).toString().padStart(2, "0");
+                const min = (stopTotalMins % 60).toString().padStart(2, "0");
+                return `${hr}:${min}`;
+            };
 
             const timeSlots = (departureTimes && departureTimes.length > 0)
                 ? departureTimes
@@ -377,6 +358,43 @@ async function seed() {
                     const arrMin = (arrMinsInDay % 60).toString().padStart(2, "0");
                     const arrivalTimeStr = `${arrHr}:${arrMin}`;
 
+                    // ── Compute boarding & dropping points for THIS schedule's departure time ──
+                    // This ensures the times reflect actual schedule timings, not placeholder "00:00"
+                    const scheduleBoardingPoints = [];
+                    const scheduleDroppingPoints = [];
+
+                    // Boarding points: all stops except the last (destination)
+                    for (let i = 0; i < route.stops.length - 1; i++) {
+                        const stop = route.stops[i];
+                        const realTime = computeStopTime(depTimeStr, stop, route.distanceInKm, route.estimatedDurationInMinutes);
+                        const points = cityPoints[stop.city] || [{ name: `${stop.city} Bus Stand`, landmark: `Main Stand` }];
+                        points.forEach((pt) => {
+                            scheduleBoardingPoints.push({
+                                city: stop.city,
+                                name: pt.name,
+                                address: pt.landmark + ", " + stop.city,
+                                time: realTime,
+                                landmark: pt.landmark
+                            });
+                        });
+                    }
+
+                    // Dropping points: all stops except the first (origin)
+                    for (let i = 1; i < route.stops.length; i++) {
+                        const stop = route.stops[i];
+                        const realTime = computeStopTime(depTimeStr, stop, route.distanceInKm, route.estimatedDurationInMinutes);
+                        const points = cityPoints[stop.city] || [{ name: `${stop.city} Bus Stand`, landmark: `Main Stand` }];
+                        points.forEach((pt) => {
+                            scheduleDroppingPoints.push({
+                                city: stop.city,
+                                name: pt.name,
+                                address: pt.landmark + ", " + stop.city,
+                                time: realTime,
+                                landmark: pt.landmark
+                            });
+                        });
+                    }
+
                     await Schedule.create({
                         routeId: route._id,
                         busId: bus._id,
@@ -388,8 +406,8 @@ async function seed() {
                         baseFare,
                         availableSeats: seats.length,
                         seats,
-                        boardingPoints,
-                        droppingPoints,
+                        boardingPoints: scheduleBoardingPoints,
+                        droppingPoints: scheduleDroppingPoints,
                         cancellationPolicy: [
                             { hoursBeforeDeparture: 24, refundPercentage: 75 },
                             { hoursBeforeDeparture: 12, refundPercentage: 50 },

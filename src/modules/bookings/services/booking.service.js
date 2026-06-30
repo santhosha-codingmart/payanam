@@ -22,6 +22,107 @@ import { ApiError } from "../../../utils/ApiError.js";
 import redis from "../../../config/redis.js";
 
 // =============================================================================
+// LADIES SEAT PROTECTION — Helper
+// =============================================================================
+//
+// Rule: A male passenger CANNOT book a seat physically adjacent to a solo
+//       female passenger who was booked by a DIFFERENT user/booking.
+//
+// Exception (allowed cases):
+//   1. The current booking itself contains both male AND female passengers
+//      (i.e. a couple/family booking) — they're together, so it's fine.
+//   2. The adjacent booked female seat belongs to a booking that also has
+//      male passengers (her booking companion is male — she's not solo).
+//
+// ADJACENCY RULES (physical next-to-each-other, not across the aisle):
+//   2+2_SEATER  → pairs: (col1,col2) and (col3,col4) — aisle between 2 & 3
+//   2+1_SLEEPER → pairs: (col1,col2) only — col3 is standalone
+//   2+1_SEATER  → pairs: (col1,col2) only — col3 is standalone
+//   1+1_SLEEPER → no adjacent pairs — aisle separates every berth
+//
+// HOW TO READ passengerGender:
+//   Schedule stores "M" / "F" / "O"
+//   Booking passengerDetails stores "male" / "female" / "other"
+// =============================================================================
+
+// Returns the column pairs that are physically adjacent for a given layout
+const getAdjacentColumnPairs = (layoutType) => {
+    switch (layoutType) {
+        case "2+2_SEATER":   return [[1, 2], [3, 4]];
+        case "2+1_SLEEPER":
+        case "2+1_SEATER":   return [[1, 2]]; // col 3 is standalone
+        case "1+1_SLEEPER":  return [];       // aisle between every berth
+        default:             return [[1, 2]]; // safe fallback
+    }
+};
+
+const checkLadiesSeatProtection = async (schedule, passengerDetails, layoutType) => {
+    // ── Does this booking have any male passengers? ──
+    const hasMales   = passengerDetails.some(p => p.gender === "male");
+    const hasFemales = passengerDetails.some(p => p.gender === "female");
+
+    // No males in this booking → no risk, skip entirely
+    if (!hasMales) return;
+
+    // Mixed-gender booking (couple / family travelling together) → allowed
+    if (hasMales && hasFemales) return;
+
+    // ── From here: this is a male-only booking ──
+    // For every male passenger, check their adjacent seats on the schedule
+    const adjacentPairs = getAdjacentColumnPairs(layoutType);
+
+    for (const passenger of passengerDetails) {
+        if (passenger.gender !== "male") continue;
+
+        const mySeat = schedule.seats.find(s => s.seatNumber === passenger.seatNumber);
+        if (!mySeat) continue;
+
+        // Find all seats that are physically adjacent to this one
+        const adjacentBookedFemaleSeats = schedule.seats.filter(s => {
+            if (s.seatNumber === mySeat.seatNumber) return false;     // skip self
+            if (s.status !== "BOOKED")              return false;     // only care about booked seats
+            if (s.passengerGender !== "F")          return false;     // only female seats
+            if (s.row  !== mySeat.row)              return false;     // must be same row
+            if (s.deck !== mySeat.deck)             return false;     // must be same deck
+            // Must be in the same adjacent column pair (not across the aisle)
+            return adjacentPairs.some(([c1, c2]) =>
+                (mySeat.column === c1 && s.column === c2) ||
+                (mySeat.column === c2 && s.column === c1)
+            );
+        });
+
+        for (const adjSeat of adjacentBookedFemaleSeats) {
+            // Look up the booking that owns this adjacent female seat
+            const adjBooking = await Booking.findOne({
+                scheduleId: schedule._id,
+                bookedSeats: adjSeat.seatNumber,
+                bookingStatus: "CONFIRMED",
+            }).select("passengerDetails");
+
+            if (!adjBooking) continue; // Booking not found — skip (edge case)
+
+            // Is the adjacent female travelling with any male companion
+            // in her OWN booking?
+            const adjacentBookingHasMale = adjBooking.passengerDetails.some(
+                p => p.gender === "male"
+            );
+
+            // She has a male companion → she's not "solo" → our male can sit next to her
+            if (adjacentBookingHasMale) continue;
+
+            // She IS solo (or all-female group) → BLOCK the seat
+            throw new ApiError(
+                403,
+                `Seat ${passenger.seatNumber} is directly adjacent to seat ${
+                    adjSeat.seatNumber
+                } which is occupied by a solo female passenger. ` +
+                `As per our ladies safety policy, this seat cannot be booked by a male travelling alone.`
+            );
+        }
+    }
+};
+
+// =============================================================================
 // PHASE 2 — CREATE BOOKING
 // =============================================================================
 //
@@ -29,9 +130,11 @@ import redis from "../../../config/redis.js";
 //   1. Verify the seat block exists in Redis (user blocked them < 10 min ago)
 //   2. Verify that the lock belongs to the current user (anti-theft check)
 //   3. Load the Schedule to get seat fares, cancellation policy, etc.
+//   3b. *** Ladies Seat Protection check ***
 //   4. Validate passenger count matches booked seat count
 //   5. Create the Booking document (PENDING status)
 //   6. Mark each seat as BOOKED in the Schedule document
+//      (also stores passengerGender so adjacent-seat checks work for future bookings)
 //   7. Release the Redis locks (no longer needed — DB is the source of truth)
 //   8. Simulate payment success (mock — no real gateway yet)
 //   9. Confirm the booking (CONFIRMED status)
@@ -82,8 +185,18 @@ export const createBookingService = async (userId, payload) => {
 
     // ── STEP 3: Load the Schedule ────────────────────────────────────────────
     // We need: seat fares, boarding/dropping points, cancellationPolicy, busId, routeId
-    const schedule = await Schedule.findById(scheduleId).populate("busId");
+    // We also need seatLayoutType from the bus to determine seat adjacency.
+    const schedule = await Schedule.findById(scheduleId).populate(
+        "busId",
+        "seatLayoutType operatorId operatorName"
+    );
     if (!schedule) throw new ApiError(404, "Schedule not found.");
+
+    // ── STEP 3b: Ladies Seat Protection ─────────────────────────────────────
+    // Checks if any male in this booking would sit next to a solo female
+    // who was booked separately by a different user.
+    const busLayoutType = schedule.busId?.seatLayoutType || "2+2_SEATER";
+    await checkLadiesSeatProtection(schedule, passengerDetails, busLayoutType);
 
     // ── STEP 4: Validate passenger count matches seat count ──────────────────
     if (passengerDetails.length !== seatNumbers.length) {
@@ -157,15 +270,23 @@ export const createBookingService = async (userId, payload) => {
             );
 
             // 5b. Mark each seat as BOOKED in the Schedule document
-            // We also reduce the availableSeats counter
+            // We also store passengerGender ("M"/"F"/"O") so that future
+            // bookings can run the Ladies Seat Protection check against
+            // already-booked seats without hitting the Booking collection.
             for (const seatNumber of seatNumbers) {
                 const seatIndex = schedule.seats.findIndex(
                     (s) => s.seatNumber === seatNumber
                 );
                 if (seatIndex !== -1) {
-                    schedule.seats[seatIndex].status = "BOOKED";
-                    schedule.seats[seatIndex].passengerName =
-                        passengerDetails.find((p) => p.seatNumber === seatNumber)?.name || "";
+                    const pax = passengerDetails.find((p) => p.seatNumber === seatNumber);
+                    // Booking model uses "male"/"female"/"other";
+                    // Schedule model uses "M"/"F"/"O" — map them here
+                    const genderMap = { male: "M", female: "F", other: "O" };
+                    schedule.seats[seatIndex].status          = "BOOKED";
+                    schedule.seats[seatIndex].passengerName   = pax?.name   || "";
+                    schedule.seats[seatIndex].passengerGender = genderMap[pax?.gender] ?? null;
+                    schedule.seats[seatIndex].passengerAge    = pax?.age    ?? null;
+                    schedule.seats[seatIndex].bookedBy        = userId;
                 }
             }
             // Decrement availableSeats

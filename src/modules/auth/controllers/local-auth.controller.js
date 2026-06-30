@@ -16,7 +16,7 @@ const cookieOptions = (ms) => ({
   secure: process.env.NODE_ENV === "production",
   // Browsers require SameSite=None cookies to be Secure. Use 'lax' during
   // local development so cookies are accepted over http://localhost.
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "none",
   maxAge: ms,
 });
 
