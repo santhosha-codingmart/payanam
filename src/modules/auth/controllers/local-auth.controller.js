@@ -15,8 +15,8 @@ import { ApiError } from "../../../utils/ApiError.js";
 const cookieOptions = (ms) => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  // SameSite="none" requires HTTPS (Secure flag). During local development
-  // we use "lax" so cookies work over plain http://localhost without errors.
+  // Browsers require SameSite=None cookies to be Secure. Use 'lax' during
+  // local development so cookies are accepted over http://localhost.
   sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   maxAge: ms,
 });
