@@ -125,7 +125,7 @@ export const deleteBusService = async (busId, operatorId) => {
     // So we delete them first.
     await Schedule.deleteMany({ busId });
     await Route.deleteMany({ busId });
-    
+
     // Finally, delete the bus itself
     await Bus.findByIdAndDelete(busId);
 
@@ -142,7 +142,7 @@ export const createRouteService = async (operatorId, routeData) => {
     if (!bus) {
         throw new ApiError(404, "Bus not found.");
     }
-    
+
     // 2. Verify the vendor actually owns this bus
     if (bus.operatorId.toString() !== operatorId.toString()) {
         throw new ApiError(403, "You can only create routes for your own buses.");
@@ -378,7 +378,7 @@ export const searchBusesService = async (from, to, date, filters = {}) => {
         })
         // Exclude the massive `seats` array to keep the payload small.
         // Users will fetch the seat map later when they click on a specific bus.
-        .select("-seats") 
+        .select("-seats")
         .sort({ departureTime: 1 }); // Sort by time ascending (morning to night)
 
     let schedules = await query;
@@ -392,7 +392,7 @@ export const searchBusesService = async (from, to, date, filters = {}) => {
     schedules = schedules.map((schedule) => {
         const scheduleObj = schedule.toObject();
         const routeInfo = routeMap.get(schedule.routeId._id.toString());
-        
+
         let calculatedFare = scheduleObj.baseFare;
 
         if (routeInfo) {
@@ -423,7 +423,7 @@ export const searchBusesService = async (from, to, date, filters = {}) => {
             address: dp.address,
             landmark: dp.landmark
         }));
-        
+
         const cancellationPolicy = (scheduleObj.cancellationPolicy || []).map(cp => ({
             hoursBeforeDeparture: cp.hoursBeforeDeparture,
             refundPercentage: cp.refundPercentage
@@ -512,7 +512,7 @@ export const blockSeatsService = async (userId, scheduleId, seatNumbers) => {
     const validSeats = [];
     for (const seatNumber of seatNumbers) {
         const seat = schedule.seats.find((s) => s.seatNumber === seatNumber);
-        
+
         if (!seat) {
             throw new ApiError(400, `Seat ${seatNumber} does not exist on this bus.`);
         }
@@ -524,32 +524,32 @@ export const blockSeatsService = async (userId, scheduleId, seatNumbers) => {
         // Check if it's already blocked in Redis by someone else
         const lockKey = `seat_lock:${scheduleId}:${seatNumber}`;
         const existingLock = await redis.get(lockKey);
-        
+
         if (existingLock && existingLock !== userId.toString()) {
             throw new ApiError(409, `Seat ${seatNumber} is currently being booked by another user. Please try again later.`);
         }
-        
+
         validSeats.push(seatNumber);
     }
 
     // 3. Acquire Redis locks (10 minutes TTL)
     const TTL_SECONDS = 600; // 10 minutes
     const pipeline = redis.pipeline();
-    
+
     for (const seatNumber of validSeats) {
         const lockKey = `seat_lock:${scheduleId}:${seatNumber}`;
         pipeline.set(lockKey, userId.toString(), "EX", TTL_SECONDS);
-        
+
         // Also update Mongoose document so UI reflects it immediately
         const seatIndex = schedule.seats.findIndex((s) => s.seatNumber === seatNumber);
         if (seatIndex !== -1) {
             schedule.seats[seatIndex].status = "BLOCKED";
         }
     }
-    
+
     // Execute Redis pipeline
     await pipeline.exec();
-    
+
     // 4. Save schedule changes
     await schedule.save();
 
@@ -559,12 +559,12 @@ export const blockSeatsService = async (userId, scheduleId, seatNumbers) => {
         try {
             const sched = await Schedule.findById(scheduleId);
             if (!sched) return;
-            
+
             let changed = false;
             for (const seatNumber of validSeats) {
                 const lockKey = `seat_lock:${scheduleId}:${seatNumber}`;
                 const lockValue = await redis.get(lockKey);
-                
+
                 // If the lock is missing (expired or deleted by booking)
                 if (!lockValue) {
                     const seatIndex = sched.seats.findIndex((s) => s.seatNumber === seatNumber);
@@ -615,9 +615,9 @@ export const addReviewService = async (userId, busId, bookingId, rating, reviewT
     // 4. Update average rating on the Bus using aggregation
     const stats = await Review.aggregate([
         { $match: { busId: bus._id } },
-        { 
-            $group: { 
-                _id: "$busId", 
+        {
+            $group: {
+                _id: "$busId",
                 avgRating: { $avg: "$rating" },
                 totalRatings: { $sum: 1 }
             }
