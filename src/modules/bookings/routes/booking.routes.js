@@ -18,9 +18,11 @@ import {
     createBooking,
     getBookingById,
     getMyBookings,
+    getVendorBookings,
     cancelBooking,
 } from "../controllers/booking.controller.js";
 import { authenticate } from "../../../middleware/auth.middleware.js";
+import { authorize } from "../../../middleware/role.middleware.js";
 import { validate } from "../../../middleware/validate.middleware.js";
 import {
     createBookingSchema,
@@ -137,6 +139,96 @@ router.post("/", authenticate, validate(createBookingSchema), createBooking);
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get("/my-bookings", authenticate, getMyBookings);
+
+// =============================================================================
+// GET /api/v1/bookings/vendor-bookings
+// NOTE: Must be defined BEFORE /:bookingId so Express doesn't treat
+// "vendor-bookings" as a bookingId param.
+// =============================================================================
+/**
+ * @swagger
+ * /api/v1/bookings/vendor-bookings:
+ *   get:
+ *     summary: Get all bookings on the vendor's buses
+ *     description: >
+ *       Returns a paginated list of all bookings made on buses owned by the
+ *       authenticated vendor. The vendor's `userId` is matched against the
+ *       `operatorId` field stored on every booking at creation time.
+ *
+ *       **Filters (all optional):**
+ *       - `status` — filter by booking status (`CONFIRMED`, `CANCELLED`, `PENDING`)
+ *       - `scheduleId` — filter to a single trip (view passenger manifest)
+ *       - `page` — page number (default: 1)
+ *       - `limit` — results per page (default: 20, max: 100)
+ *     tags: [Bookings]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [CONFIRMED, CANCELLED, PENDING]
+ *         description: Filter by booking status
+ *       - in: query
+ *         name: scheduleId
+ *         schema:
+ *           type: string
+ *         description: MongoDB ObjectId of a specific schedule (trip)
+ *         example: "665f1a2b3c4d5e6f7a8b9c0d"
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *           maximum: 100
+ *         description: Number of results per page
+ *     responses:
+ *       200:
+ *         description: List of bookings with pagination metadata.
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 - bookingId: "PAY-A3F2B1"
+ *                   bookingStatus: "CONFIRMED"
+ *                   paymentStatus: "SUCCESS"
+ *                   totalFare: 875
+ *                   bookedSeats: ["L1", "L2"]
+ *                   bookedAt: "2026-06-30T08:45:00.000Z"
+ *                   userId:
+ *                     name: "Santhosh Kumar"
+ *                     email: "santhosh@example.com"
+ *                     phoneNo: "+919876543210"
+ *               pagination:
+ *                 totalCount: 142
+ *                 totalPages: 8
+ *                 currentPage: 1
+ *                 limit: 20
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Access denied — vendor role required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Access denied. This action requires one of the following roles: vendor."
+ */
+router.get("/vendor-bookings", authenticate, authorize("vendor"), getVendorBookings);
 
 // =============================================================================
 // GET /api/v1/bookings/:bookingId

@@ -102,3 +102,27 @@ export const cancelBooking = async (req, res, next) => {
         next(error);
     }
 };
+
+// =============================================================================
+// GET /api/v1/bookings/vendor-bookings
+// Returns all bookings on the vendor's own buses (vendor dashboard view).
+// Only accessible by role === "vendor". Supports filters + pagination.
+// =============================================================================
+export const getVendorBookings = async (req, res, next) => {
+    try {
+        // req.user._id IS the operatorId stored on every Booking the vendor owns.
+        // req.query passes ?status=, ?scheduleId=, ?page=, ?limit= to the service.
+        const result = await bookingService.getVendorBookingsService(
+            req.user._id,
+            req.query
+        );
+
+        return res.status(200).json({
+            success: true,
+            data: result.bookings,
+            pagination: result.pagination,
+        });
+    } catch (error) {
+        next(error);
+    }
+};

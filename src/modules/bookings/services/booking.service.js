@@ -382,6 +382,74 @@ export const getMyBookingsService = async (userId) => {
 };
 
 // =============================================================================
+// VENDOR — GET ALL BOOKINGS ON THEIR BUSES
+// =============================================================================
+//
+// WHY THIS EXISTS:
+//   Vendors need a dashboard view showing every booking made on their buses.
+//   The `operatorId` field is already stored on every Booking document at the
+//   time of creation (copied from schedule.busId.operatorId), so this is just
+//   a simple indexed query — no joins or extra lookups needed.
+//
+// FEATURES:
+//   - Filter by bookingStatus (CONFIRMED / CANCELLED / PENDING)
+//   - Filter by a specific scheduleId (e.g. view one trip's passengers)
+//   - Pagination via page + limit query params
+//   - Sorted by most recent booking first
+//
+// =============================================================================
+export const getVendorBookingsService = async (operatorId, filters = {}) => {
+    const { status, scheduleId, page = 1, limit = 20 } = filters;
+
+    // ── Build query ────────────────────────────────────────────────────────────
+    // operatorId is an indexed field on Booking — this query is fast.
+    const query = { operatorId };
+
+    if (status) {
+        // Validate status is one of the enum values to prevent junk queries
+        const validStatuses = ["PENDING", "CONFIRMED", "CANCELLED"];
+        if (!validStatuses.includes(status.toUpperCase())) {
+            throw new ApiError(400, `Invalid status. Must be one of: ${validStatuses.join(", ")}`);
+        }
+        query.bookingStatus = status.toUpperCase();
+    }
+
+    if (scheduleId) {
+        query.scheduleId = scheduleId;
+    }
+
+    // ── Pagination ─────────────────────────────────────────────────────────────
+    const pageNum  = Math.max(1, parseInt(page));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit))); // cap at 100
+    const skip     = (pageNum - 1) * limitNum;
+
+    // ── Execute query in parallel with count ───────────────────────────────────
+    // Running both queries simultaneously halves the response time vs sequential.
+    const [bookings, totalCount] = await Promise.all([
+        Booking.find(query)
+            .sort({ bookedAt: -1 })
+            .skip(skip)
+            .limit(limitNum)
+            .populate("userId",     "name email phoneNo")        // passenger contact
+            .populate("busId",      "busName busNumber busType")
+            .populate("routeId",    "source destination")
+            .populate("scheduleId", "departureDate departureTime arrivalTime")
+            .select("-cancellationPolicy -__v"), // trim fields vendor doesn't need
+        Booking.countDocuments(query),
+    ]);
+
+    return {
+        bookings,
+        pagination: {
+            totalCount,
+            totalPages: Math.ceil(totalCount / limitNum),
+            currentPage: pageNum,
+            limit: limitNum,
+        },
+    };
+};
+
+// =============================================================================
 // PHASE 4 — CANCEL BOOKING
 // =============================================================================
 //

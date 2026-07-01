@@ -11,6 +11,7 @@ import { Schedule } from "../models/schedule.model.js";
 import { ApiError } from "../../../utils/ApiError.js";
 import redis from "../../../config/redis.js";
 import { Review } from "../models/review.model.js";
+import Booking from "../../bookings/models/booking.model.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BUS CRUD (Vendor-only)
@@ -585,6 +586,71 @@ export const blockSeatsService = async (userId, scheduleId, seatNumbers) => {
     return {
         message: "Seats blocked successfully for 10 minutes.",
         expiresAt
+    };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCHEDULE CANCEL (Vendor-only)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// What this does:
+//   1. Verifies the schedule exists and belongs to this vendor
+//   2. Prevents cancelling an already-cancelled or completed schedule
+//   3. Finds all CONFIRMED bookings on this schedule
+//   4. Cancels each booking and issues a 100% refund (vendor's fault = full refund)
+//   5. Marks the schedule status as "CANCELLED"
+//
+// WHY 100% REFUND:
+//   When the vendor cancels, the passenger has no fault. Industry standard
+//   (Redbus, MakeMyTrip) is always a full refund on operator cancellations.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+export const cancelScheduleService = async (operatorId, scheduleId) => {
+    // 1. Fetch schedule and verify ownership
+    const schedule = await Schedule.findById(scheduleId);
+    if (!schedule) throw new ApiError(404, "Schedule not found.");
+
+    if (schedule.operatorId.toString() !== operatorId.toString()) {
+        throw new ApiError(403, "You can only cancel your own schedules.");
+    }
+
+    // 2. Guard against cancelling already-terminal states
+    if (schedule.status === "CANCELLED") {
+        throw new ApiError(409, "This schedule is already cancelled.");
+    }
+    if (schedule.status === "COMPLETED") {
+        throw new ApiError(400, "A completed schedule cannot be cancelled.");
+    }
+    if (schedule.status === "IN_TRANSIT") {
+        throw new ApiError(400, "Cannot cancel a schedule that is currently in transit.");
+    }
+
+    // 3. Find all confirmed bookings on this schedule
+    const affectedBookings = await Booking.find({
+        scheduleId,
+        bookingStatus: "CONFIRMED",
+    });
+
+    // 4. Cancel each booking with a full refund (vendor-initiated = 100% refund)
+    const cancelledCount = affectedBookings.length;
+    for (const booking of affectedBookings) {
+        booking.bookingStatus  = "CANCELLED";
+        booking.paymentStatus  = "REFUNDED";
+        booking.refundAmount   = booking.totalFare; // 100% refund
+        booking.cancelledAt    = new Date();
+        await booking.save();
+    }
+
+    // 5. Mark schedule as cancelled
+    schedule.status = "CANCELLED";
+    await schedule.save();
+
+    return {
+        scheduleId,
+        cancelledBookings: cancelledCount,
+        message: cancelledCount > 0
+            ? `Schedule cancelled. ${cancelledCount} booking(s) have been refunded in full.`
+            : "Schedule cancelled. No active bookings were affected.",
     };
 };
 

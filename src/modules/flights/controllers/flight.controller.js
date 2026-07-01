@@ -1,92 +1,98 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Bus Controller — The HTTP Bridge
-// Controllers should be extremely thin. Their ONLY job is to:
-// 1. Extract data from the incoming HTTP Request (`req`)
-// 2. Pass that data to the Service layer to do the actual work
-// 3. Take the result from the Service and format it into an HTTP Response (`res`)
-// 4. Catch any errors and pass them to the global error handler (`next`)
+// Flight Controller — The HTTP Bridge
+// Controllers must be thin. Their ONLY job is to:
+//   1. Extract data from the HTTP Request (req.body, req.params, req.query, req.user)
+//   2. Call the appropriate Service function with that data
+//   3. Format the Service's result into an HTTP Response (res.json)
+//   4. Catch any errors and forward them to the global error handler (next)
+//
+// NO business logic lives here. All rules are in flight.service.js.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import * as busService from "../services/bus.service.js";
+import * as flightService from "../services/flight.service.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BUS CRUD (Vendor-only)
+// FLIGHT CRUD (Vendor-only)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const createBus = async (req, res, next) => {
+// POST /api/v1/flights — Create a new aircraft
+export const createFlight = async (req, res, next) => {
     try {
-        // req.user._id comes from the `authenticate` middleware
-        // req.body comes from the user (and is already validated by Zod)
-        const bus = await busService.createBusService(req.user._id, req.body);
+        // req.user._id is injected by the `authenticate` middleware (from JWT)
+        // req.body has already been validated by the Zod `validate` middleware
+        const flight = await flightService.createFlightService(req.user._id, req.body);
 
-        // 201 Created is the standard HTTP status for a successful POST
+        // 201 Created — the standard HTTP status for a successful resource creation
         return res.status(201).json({
             success: true,
-            message: "Bus created successfully.",
-            data: bus,
+            message: "Flight created successfully.",
+            data: flight,
         });
     } catch (error) {
-        // next(error) passes the error down the Express middleware chain
-        // until it hits our global error handler in `error.middleware.js`
+        // next(error) delegates to Express's global error handler middleware
         next(error);
     }
 };
 
-export const getVendorBuses = async (req, res, next) => {
+// GET /api/v1/flights — List all flights owned by the logged-in vendor
+export const getVendorFlights = async (req, res, next) => {
     try {
-        // Vendors can only see their own buses
-        const buses = await busService.getVendorBusesService(req.user._id);
+        // Only returns flights where operatorId === req.user._id
+        const flights = await flightService.getVendorFlightsService(req.user._id);
 
         return res.status(200).json({
             success: true,
-            message: "Buses fetched successfully.",
-            count: buses.length,
-            data: buses,
+            message: "Flights fetched successfully.",
+            count: flights.length,
+            data: flights,
         });
     } catch (error) {
         next(error);
     }
 };
 
-export const getBusById = async (req, res, next) => {
+// GET /api/v1/flights/:id — Get a specific flight by ID
+export const getFlightById = async (req, res, next) => {
     try {
-        // req.params.id comes from the URL path: /api/v1/buses/:id
-        const bus = await busService.getBusByIdService(req.params.id);
+        // req.params.id is the dynamic segment from the URL: /flights/:id
+        const flight = await flightService.getFlightByIdService(req.params.id);
 
         return res.status(200).json({
             success: true,
-            data: bus,
+            data: flight,
         });
     } catch (error) {
         next(error);
     }
 };
 
-export const updateBus = async (req, res, next) => {
+// PATCH /api/v1/flights/:id — Partially update a flight (owner only)
+export const updateFlight = async (req, res, next) => {
     try {
-        const bus = await busService.updateBusService(
+        const flight = await flightService.updateFlightService(
             req.params.id,
-            req.user._id, // Pass user ID so service can check ownership
+            req.user._id, // Passed to service so it can verify ownership
             req.body
         );
 
         return res.status(200).json({
             success: true,
-            message: "Bus updated successfully.",
-            data: bus,
+            message: "Flight updated successfully.",
+            data: flight,
         });
     } catch (error) {
         next(error);
     }
 };
 
-export const deleteBus = async (req, res, next) => {
+// DELETE /api/v1/flights/:id — Delete a flight + cascade-delete routes & schedules
+export const deleteFlight = async (req, res, next) => {
     try {
-        await busService.deleteBusService(req.params.id, req.user._id);
+        await flightService.deleteFlightService(req.params.id, req.user._id);
 
         return res.status(200).json({
             success: true,
-            message: "Bus and its associated routes and schedules deleted successfully.",
+            message: "Flight and all associated routes and schedules deleted successfully.",
         });
     } catch (error) {
         next(error);
@@ -94,12 +100,13 @@ export const deleteBus = async (req, res, next) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ROUTE (Vendor-only)
+// FLIGHT ROUTE (Vendor-only)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const createRoute = async (req, res, next) => {
+// POST /api/v1/flights/routes — Create a new route for an aircraft
+export const createFlightRoute = async (req, res, next) => {
     try {
-        const route = await busService.createRouteService(req.user._id, req.body);
+        const route = await flightService.createFlightRouteService(req.user._id, req.body);
 
         return res.status(201).json({
             success: true,
@@ -111,9 +118,10 @@ export const createRoute = async (req, res, next) => {
     }
 };
 
-export const getRoutesForBus = async (req, res, next) => {
+// GET /api/v1/flights/:id/routes — Get all routes for a specific aircraft
+export const getRoutesForFlight = async (req, res, next) => {
     try {
-        const routes = await busService.getRoutesForBusService(req.params.id);
+        const routes = await flightService.getRoutesForFlightService(req.params.id);
 
         return res.status(200).json({
             success: true,
@@ -126,12 +134,13 @@ export const getRoutesForBus = async (req, res, next) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SCHEDULE (Vendor-only)
+// FLIGHT SCHEDULE (Vendor-only)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const createSchedule = async (req, res, next) => {
+// POST /api/v1/flights/schedules — Create a new scheduled trip
+export const createFlightSchedule = async (req, res, next) => {
     try {
-        const schedule = await busService.createScheduleService(req.user._id, req.body);
+        const schedule = await flightService.createFlightScheduleService(req.user._id, req.body);
 
         return res.status(201).json({
             success: true,
@@ -143,10 +152,10 @@ export const createSchedule = async (req, res, next) => {
     }
 };
 
-// Gets the full seat map for the frontend to render the bus layout
-export const getScheduleSeats = async (req, res, next) => {
+// GET /api/v1/flights/schedules/:scheduleId/seats — View the seat map for a trip
+export const getFlightScheduleSeats = async (req, res, next) => {
     try {
-        const seatData = await busService.getScheduleSeatsService(req.params.scheduleId);
+        const seatData = await flightService.getFlightScheduleSeatsService(req.params.scheduleId);
 
         return res.status(200).json({
             success: true,
@@ -159,24 +168,24 @@ export const getScheduleSeats = async (req, res, next) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SEARCH (Public — No auth required)
+// SEARCH (Public — no auth required)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const searchBuses = async (req, res, next) => {
+// GET /api/v1/flights/search?from=DEL&to=BOM&date=2026-07-01
+export const searchFlights = async (req, res, next) => {
     try {
-        // req.query pulls parameters from the URL
-        // E.g., /search?from=Chennai&to=Bangalore&date=2026-06-25&isAC=true
-        // The `...filters` syntax puts any extra params (like isAC, minPrice) into an object
+        // Destructure the known params; spread remaining into `filters`
+        // E.g., ?from=DEL&to=BOM&date=2026-07-01&sortBy=price_low&maxPrice=5000
         const { from, to, date, ...filters } = req.query;
-        
-        const results = await busService.searchBusesService(from, to, date, filters);
+
+        const results = await flightService.searchFlightsService(from, to, date, filters);
 
         return res.status(200).json({
             success: true,
             message:
                 results.length > 0
-                    ? `Found ${results.length} bus(es) from ${from} to ${to}.`
-                    : `No buses found from ${from} to ${to} on ${date}.`,
+                    ? `Found ${results.length} flight(s) from ${from} to ${to}.`
+                    : `No flights found from ${from} to ${to} on ${date}.`,
             count: results.length,
             data: results,
         });
@@ -189,41 +198,19 @@ export const searchBuses = async (req, res, next) => {
 // SEAT BLOCKING (Phase 1)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// POST /api/v1/flights/schedules/:scheduleId/block-seats
 export const blockSeats = async (req, res, next) => {
     try {
         const { scheduleId } = req.params;
         const { seatNumbers } = req.body;
-        // User must be logged in, so req.user exists
-        const userId = req.user._id;
+        const userId = req.user._id; // Requires authentication
 
-        const result = await busService.blockSeatsService(userId, scheduleId, seatNumbers);
+        const result = await flightService.blockSeatsService(userId, scheduleId, seatNumbers);
 
         return res.status(200).json({
             success: true,
             message: result.message,
-            expiresAt: result.expiresAt
-        });
-    } catch (error) {
-        next(error);
-    }
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// REVIEWS (Phase 5)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const addReview = async (req, res, next) => {
-    try {
-        const { busId } = req.params;
-        const { bookingId, rating, review } = req.body;
-        const userId = req.user._id;
-
-        const result = await busService.addReviewService(userId, busId, bookingId, rating, review);
-
-        return res.status(201).json({
-            success: true,
-            message: "Review added successfully.",
-            data: result
+            expiresAt: result.expiresAt,
         });
     } catch (error) {
         next(error);
@@ -234,10 +221,11 @@ export const addReview = async (req, res, next) => {
 // SCHEDULE CANCEL (Vendor-only)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const cancelSchedule = async (req, res, next) => {
+// PATCH /api/v1/flights/schedules/:scheduleId/cancel
+export const cancelFlightSchedule = async (req, res, next) => {
     try {
-        const result = await busService.cancelScheduleService(
-            req.user._id,           // vendor's operatorId from JWT
+        const result = await flightService.cancelFlightScheduleService(
+            req.user._id,        // vendor's operatorId from JWT
             req.params.scheduleId
         );
 
@@ -245,9 +233,34 @@ export const cancelSchedule = async (req, res, next) => {
             success: true,
             message: result.message,
             data: {
-                scheduleId:       result.scheduleId,
+                scheduleId:        result.scheduleId,
                 cancelledBookings: result.cancelledBookings,
             },
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REVIEWS AND RATINGS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// POST /api/v1/flights/:flightId/reviews
+export const addFlightReview = async (req, res, next) => {
+    try {
+        const { flightId } = req.params;
+        const { bookingId, rating, review } = req.body;
+        const userId = req.user._id;
+
+        const result = await flightService.addFlightReviewService(
+            userId, flightId, bookingId, rating, review
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: "Review added successfully.",
+            data: result,
         });
     } catch (error) {
         next(error);

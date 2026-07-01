@@ -85,6 +85,8 @@ const options = {
                     },
                 },
 
+                // Updated to include role/name/companyName so the frontend can redirect
+                // to the correct dashboard immediately after login without an extra /profile call.
                 AuthUserResponse: {
                     type: "object",
                     properties: {
@@ -97,10 +99,27 @@ const options = {
                                     type: "string",
                                     example: "665f1a2b3c4d5e6f7a8b9c0d",
                                 },
+                                name: {
+                                    type: "string",
+                                    nullable: true,
+                                    example: "Parveen Kumar",
+                                },
                                 email: {
                                     type: "string",
                                     format: "email",
                                     example: "user@example.com",
+                                },
+                                role: {
+                                    type: "string",
+                                    enum: ["user", "vendor", "admin"],
+                                    example: "vendor",
+                                    description: "Use this to redirect after login: vendor→dashboard, user→home, admin→admin panel",
+                                },
+                                companyName: {
+                                    type: "string",
+                                    nullable: true,
+                                    example: "Parveen Travels Pvt. Ltd.",
+                                    description: "Only populated for vendors. null for regular users.",
                                 },
                             },
                         },
@@ -184,7 +203,11 @@ const options = {
                             type: "object",
                             properties: {
                                 id: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0d" },
+                                name: { type: "string", nullable: true, example: "Parveen Kumar" },
+                                email: { type: "string", nullable: true, format: "email", example: "user@example.com" },
                                 mobile: { type: "string", example: "+919876543210" },
+                                role: { type: "string", enum: ["user", "vendor", "admin"], example: "user" },
+                                companyName: { type: "string", nullable: true, example: "Parveen Travels Pvt. Ltd." },
                             },
                         },
                     },
@@ -213,6 +236,16 @@ const options = {
                             type: "string",
                             example: "+919876543210",
                         },
+                        companyName: {
+                            type: "string",
+                            example: "Parveen Travels Pvt. Ltd.",
+                            description: "Vendor only. 2–50 characters",
+                        },
+                        gstNumber: {
+                            type: "string",
+                            example: "33AABCP1234A1ZX",
+                            description: "Vendor only. Indian GST registration number",
+                        },
                     },
                 },
 
@@ -230,6 +263,8 @@ const options = {
                                 email: { type: "string", example: "santhosh@example.com" },
                                 phoneNo: { type: "string", example: "+919876543210" },
                                 role: { type: "string", example: "user" },
+                                companyName: { type: "string", nullable: true, example: "Parveen Travels Pvt. Ltd." },
+                                gstNumber: { type: "string", nullable: true, example: "33AABCP1234A1ZX" },
                                 isEmailVerified: { type: "boolean", example: false },
                                 isPhoneVerified: { type: "boolean", example: true },
                                 createdAt: { type: "string", format: "date-time" },
@@ -666,7 +701,423 @@ const options = {
                     },
                 },
 
-            }, // ← closes schemas
+                // ─────────────────────────────────────────────────────────
+                // FLIGHTS MODULE
+                // ─────────────────────────────────────────────────────────
+
+                // ── Shared sub-schemas ──────────────────────────────────
+
+                // A single seat in an aircraft's seat layout template.
+                // Used in CreateFlightRequest.seatLayout array.
+                FlightSeatLayoutItem: {
+                    type: "object",
+                    required: ["seatNumber", "row", "column"],
+                    properties: {
+                        seatNumber: { type: "string", example: "3A", description: "Seat identifier (row + column letter)" },
+                        cabinClass: { type: "string", enum: ["ECONOMY", "BUSINESS", "FIRST"], example: "ECONOMY" },
+                        seatType: { type: "string", enum: ["window", "aisle", "middle"], example: "window" },
+                        row: { type: "integer", example: 3 },
+                        column: { type: "string", example: "A", description: "Single letter A-F" },
+                        isExtraLegroom: { type: "boolean", example: false },
+                        fare: { type: "number", example: 4500, description: "Base fare for this specific seat" },
+                    },
+                },
+
+                // An airport with its IATA code — used for source/destination.
+                AirportItem: {
+                    type: "object",
+                    required: ["name", "iataCode", "city", "country"],
+                    properties: {
+                        name: { type: "string", example: "Indira Gandhi International Airport" },
+                        iataCode: { type: "string", minLength: 3, maxLength: 3, example: "DEL", description: "3-letter IATA code" },
+                        city: { type: "string", example: "Delhi" },
+                        country: { type: "string", example: "India", default: "India" },
+                    },
+                },
+
+                // A stop in a FlightRoute's ordered stops array.
+                // `order` enforces travel direction (DEL=1, BOM=2 → only DEL→BOM is valid).
+                FlightStopItem: {
+                    type: "object",
+                    required: ["name", "iataCode", "city", "arrivalTime", "departureTime", "order"],
+                    properties: {
+                        name: { type: "string", example: "Chhatrapati Shivaji Maharaj International Airport" },
+                        iataCode: { type: "string", example: "BOM" },
+                        city: { type: "string", example: "Mumbai" },
+                        country: { type: "string", example: "India" },
+                        arrivalTime: { type: "string", example: "08:30", description: "HH:mm 24-hour format" },
+                        departureTime: { type: "string", example: "08:45", description: "HH:mm 24-hour format" },
+                        minutesFromSource: { type: "integer", example: 130, description: "Minutes elapsed from the first departure to this stop. Used for segment duration calculation." },
+                        order: { type: "integer", example: 2, description: "Sequence position (1 = departure airport). Prevents reverse-direction matches." },
+                    },
+                },
+
+                // ── Flight (Aircraft) CRUD ──────────────────────────────
+
+                CreateFlightRequest: {
+                    type: "object",
+                    required: ["operatorName", "airlineName", "flightNumber", "registrationNumber", "aircraftType", "classType", "totalSeats", "seatLayout"],
+                    properties: {
+                        operatorName: { type: "string", example: "IndiGo Airlines", description: "Operator/company display name" },
+                        airlineName: { type: "string", example: "IndiGo", description: "Short airline brand name" },
+                        flightNumber: { type: "string", example: "6E-204", description: "IATA flight number. Auto-uppercased." },
+                        registrationNumber: { type: "string", example: "VT-IGP", description: "Government-issued aircraft tail number. Must be globally unique." },
+                        aircraftType: {
+                            type: "string",
+                            enum: ["AIRBUS_A320", "AIRBUS_A321", "BOEING_737", "BOEING_777", "BOEING_787", "ATR_72", "EMBRAER_E175"],
+                            example: "AIRBUS_A320",
+                        },
+                        classType: {
+                            type: "string",
+                            enum: ["ECONOMY", "BUSINESS", "FIRST", "ECONOMY_BUSINESS", "ECONOMY_FIRST", "ALL_CLASSES"],
+                            example: "ECONOMY",
+                            description: "Cabin configuration of this aircraft",
+                        },
+                        totalSeats: { type: "integer", example: 180, description: "Total bookable seats across all cabin classes" },
+                        economySeats: { type: "integer", example: 162 },
+                        businessSeats: { type: "integer", example: 18 },
+                        firstClassSeats: { type: "integer", example: 0 },
+                        hasBusinessClass: { type: "boolean", example: false },
+                        hasFirstClass: { type: "boolean", example: false },
+                        amenities: {
+                            type: "array",
+                            items: {
+                                type: "string",
+                                enum: ["WiFi", "Meal", "Snack", "Entertainment", "Power Outlet", "USB Charging", "Extra Legroom", "Priority Boarding"],
+                            },
+                            example: ["Meal", "USB Charging"],
+                        },
+                        seatLayout: {
+                            type: "array",
+                            description: "Seat-by-seat layout template. Copied into every FlightSchedule created for this aircraft.",
+                            items: { $ref: "#/components/schemas/FlightSeatLayoutItem" },
+                        },
+                    },
+                },
+
+                UpdateFlightRequest: {
+                    type: "object",
+                    description: "All fields optional — only the provided fields are updated (PATCH semantics).",
+                    properties: {
+                        airlineName: { type: "string", example: "IndiGo Express" },
+                        flightNumber: { type: "string", example: "6E-205" },
+                        registrationNumber: { type: "string", example: "VT-IGA" },
+                        aircraftType: {
+                            type: "string",
+                            enum: ["AIRBUS_A320", "AIRBUS_A321", "BOEING_737", "BOEING_777", "BOEING_787", "ATR_72", "EMBRAER_E175"],
+                        },
+                        amenities: { type: "array", items: { type: "string" } },
+                        status: { type: "string", enum: ["ACTIVE", "INACTIVE", "MAINTENANCE"], example: "MAINTENANCE" },
+                    },
+                },
+
+                FlightResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Flight created successfully." },
+                        data: {
+                            type: "object",
+                            properties: {
+                                _id: { type: "string", example: "682abc1234567890abcd1234" },
+                                operatorId: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0d" },
+                                operatorName: { type: "string", example: "IndiGo Airlines" },
+                                airlineName: { type: "string", example: "IndiGo" },
+                                flightNumber: { type: "string", example: "6E-204" },
+                                registrationNumber: { type: "string", example: "VT-IGP" },
+                                aircraftType: { type: "string", example: "AIRBUS_A320" },
+                                classType: { type: "string", example: "ECONOMY" },
+                                totalSeats: { type: "integer", example: 180 },
+                                status: { type: "string", example: "ACTIVE" },
+                                averageRating: { type: "number", example: 0 },
+                                totalRatings: { type: "integer", example: 0 },
+                                createdAt: { type: "string", format: "date-time" },
+                            },
+                        },
+                    },
+                },
+
+                FlightListResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Flights fetched successfully." },
+                        count: { type: "integer", example: 2 },
+                        data: { type: "array", items: { type: "object" } },
+                    },
+                },
+
+                // ── Flight Routes ───────────────────────────────────────
+
+                CreateFlightRouteRequest: {
+                    type: "object",
+                    required: ["flightId", "source", "destination", "stops", "distanceInKm", "estimatedDurationInMinutes"],
+                    properties: {
+                        flightId: { type: "string", example: "682abc1234567890abcd1234" },
+                        source: { $ref: "#/components/schemas/AirportItem" },
+                        destination: {
+                            allOf: [{ $ref: "#/components/schemas/AirportItem" }],
+                            example: {
+                                name: "Chhatrapati Shivaji Maharaj International Airport",
+                                iataCode: "BOM",
+                                city: "Mumbai",
+                                country: "India",
+                            },
+                        },
+                        stops: {
+                            type: "array",
+                            description: "Ordered list of ALL airports (departure + layovers + arrival). Minimum 2 (direct flight = source + destination only).",
+                            items: { $ref: "#/components/schemas/FlightStopItem" },
+                            example: [
+                                { name: "Indira Gandhi International Airport", iataCode: "DEL", city: "Delhi", arrivalTime: "06:30", departureTime: "06:30", minutesFromSource: 0, order: 1 },
+                                { name: "Chhatrapati Shivaji Maharaj International Airport", iataCode: "BOM", city: "Mumbai", arrivalTime: "08:45", departureTime: "08:45", minutesFromSource: 135, order: 2 },
+                            ],
+                        },
+                        distanceInKm: { type: "number", example: 1150, description: "Total route distance in kilometres" },
+                        estimatedDurationInMinutes: { type: "integer", example: 135, description: "Total flight time source → destination" },
+                    },
+                },
+
+                FlightRouteResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Route created successfully." },
+                        data: { type: "object" },
+                    },
+                },
+
+                FlightRouteListResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        count: { type: "integer", example: 2 },
+                        data: { type: "array", items: { type: "object" } },
+                    },
+                },
+
+                // ── Flight Schedules ────────────────────────────────────
+
+                CreateFlightScheduleRequest: {
+                    type: "object",
+                    required: ["routeId", "flightId", "departureDate", "departureTime", "arrivalTime", "baseFare"],
+                    properties: {
+                        routeId: { type: "string", example: "682abc1234567890abcd5678" },
+                        flightId: { type: "string", example: "682abc1234567890abcd1234" },
+                        departureDate: { type: "string", example: "2026-07-10", description: "YYYY-MM-DD" },
+                        arrivalDate: { type: "string", example: "2026-07-10", description: "YYYY-MM-DD. Optional — defaults to departureDate for same-day flights." },
+                        departureTime: { type: "string", example: "06:30", description: "HH:mm 24-hour" },
+                        arrivalTime: { type: "string", example: "08:45", description: "HH:mm 24-hour" },
+                        baseFare: { type: "number", example: 4500, description: "Economy base fare in INR" },
+                        departureTerminal: { type: "string", example: "Terminal 3", description: "Optional departure terminal" },
+                        arrivalTerminal: { type: "string", example: "T2", description: "Optional arrival terminal" },
+                        mealOptions: {
+                            type: "array",
+                            items: { type: "string", enum: ["VEG", "NON_VEG", "VEGAN", "JAIN", "DIABETIC"] },
+                            example: ["VEG", "NON_VEG"],
+                        },
+                        cancellationPolicy: {
+                            type: "array",
+                            description: "Optional. Defaults to a 4-tier policy (75%/50%/25%/0%) if omitted.",
+                            items: { $ref: "#/components/schemas/CancellationTier" },
+                        },
+                    },
+                },
+
+                FlightScheduleResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Schedule created successfully." },
+                        data: { type: "object" },
+                    },
+                },
+
+                // ── Flight Seat Layout ──────────────────────────────────
+
+                FlightSeatLayoutResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Seat layout fetched successfully." },
+                        data: {
+                            type: "object",
+                            properties: {
+                                scheduleId: { type: "string", example: "682abc1234567890abcd9999" },
+                                flight: {
+                                    type: "object",
+                                    properties: {
+                                        airlineName: { type: "string", example: "IndiGo" },
+                                        flightNumber: { type: "string", example: "6E-204" },
+                                        aircraftType: { type: "string", example: "AIRBUS_A320" },
+                                        amenities: { type: "array", items: { type: "string" } },
+                                        averageRating: { type: "number", example: 4.2 },
+                                    },
+                                },
+                                route: {
+                                    type: "object",
+                                    properties: {
+                                        source: { $ref: "#/components/schemas/AirportItem" },
+                                        destination: { $ref: "#/components/schemas/AirportItem" },
+                                        distanceInKm: { type: "number", example: 1150 },
+                                        estimatedDurationInMinutes: { type: "integer", example: 135 },
+                                    },
+                                },
+                                departureDate: { type: "string", format: "date-time" },
+                                departureTime: { type: "string", example: "06:30" },
+                                arrivalTime: { type: "string", example: "08:45" },
+                                departureTerminal: { type: "string", example: "Terminal 3" },
+                                arrivalTerminal: { type: "string", example: "T2" },
+                                baseFare: { type: "number", example: 4500 },
+                                availableSeats: { type: "integer", example: 165 },
+                                totalSeats: { type: "integer", example: 180 },
+                                seats: {
+                                    type: "array",
+                                    items: {
+                                        type: "object",
+                                        properties: {
+                                            seatNumber: { type: "string", example: "3A" },
+                                            cabinClass: { type: "string", enum: ["ECONOMY", "BUSINESS", "FIRST"], example: "ECONOMY" },
+                                            seatType: { type: "string", enum: ["window", "aisle", "middle"], example: "window" },
+                                            row: { type: "integer", example: 3 },
+                                            column: { type: "string", example: "A" },
+                                            isExtraLegroom: { type: "boolean", example: false },
+                                            fare: { type: "number", example: 4500 },
+                                            status: { type: "string", enum: ["AVAILABLE", "BOOKED", "BLOCKED"], example: "AVAILABLE" },
+                                            passengerName: { type: "string", nullable: true },
+                                        },
+                                    },
+                                },
+                                mealOptions: { type: "array", items: { type: "string" }, example: ["VEG", "NON_VEG"] },
+                                cancellationPolicy: { type: "array", items: { $ref: "#/components/schemas/CancellationTier" } },
+                                status: { type: "string", example: "SCHEDULED" },
+                            },
+                        },
+                    },
+                },
+
+                // ── Flight Search ───────────────────────────────────────
+
+                FlightSearchResultResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Found 4 flight(s) from DEL to BOM." },
+                        count: { type: "integer", example: 4 },
+                        data: {
+                            type: "array",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    scheduleId: { type: "string", example: "682abc1234567890abcd9999" },
+                                    operator: {
+                                        type: "object",
+                                        properties: {
+                                            id: { type: "string" },
+                                            name: { type: "string", example: "IndiGo Airlines" },
+                                        },
+                                    },
+                                    flight: {
+                                        type: "object",
+                                        properties: {
+                                            id: { type: "string" },
+                                            airlineName: { type: "string", example: "IndiGo" },
+                                            flightNumber: { type: "string", example: "6E-204" },
+                                            aircraftType: { type: "string", example: "AIRBUS_A320" },
+                                            classType: { type: "string", example: "ECONOMY" },
+                                            hasBusinessClass: { type: "boolean", example: false },
+                                            amenities: { type: "array", items: { type: "string" }, example: ["Meal", "USB Charging"] },
+                                            rating: { type: "number", example: 4.2 },
+                                        },
+                                    },
+                                    journey: {
+                                        type: "object",
+                                        properties: {
+                                            departureDate: { type: "string", format: "date-time" },
+                                            arrivalDate: { type: "string", format: "date-time" },
+                                            departureTime: { type: "string", example: "06:30" },
+                                            arrivalTime: { type: "string", example: "08:45" },
+                                            durationMinutes: { type: "integer", example: 135 },
+                                            source: { type: "string", example: "Delhi (DEL)" },
+                                            destination: { type: "string", example: "Mumbai (BOM)" },
+                                            departureTerminal: { type: "string", example: "Terminal 3", nullable: true },
+                                            arrivalTerminal: { type: "string", example: "T2", nullable: true },
+                                        },
+                                    },
+                                    pricing: {
+                                        type: "object",
+                                        properties: {
+                                            baseFare: { type: "number", example: 4500 },
+                                        },
+                                    },
+                                    seats: {
+                                        type: "object",
+                                        properties: {
+                                            available: { type: "integer", example: 165 },
+                                            total: { type: "integer", example: 180 },
+                                        },
+                                    },
+                                    mealOptions: { type: "array", items: { type: "string" }, example: ["VEG", "NON_VEG"] },
+                                    cancellationPolicy: { type: "array", items: { $ref: "#/components/schemas/CancellationTier" } },
+                                    status: { type: "string", example: "SCHEDULED" },
+                                },
+                            },
+                        },
+                    },
+                },
+
+                // ── Vendor Dashboard ────────────────────────────────────
+
+                VendorDashboardResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Dashboard summary fetched successfully." },
+                        data: {
+                            type: "object",
+                            properties: {
+                                buses: {
+                                    type: "object",
+                                    properties: {
+                                        total:    { type: "integer", example: 4 },
+                                        active:   { type: "integer", example: 3 },
+                                        inactive: { type: "integer", example: 1 },
+                                    },
+                                },
+                                flights: {
+                                    type: "object",
+                                    properties: {
+                                        total:    { type: "integer", example: 2 },
+                                        active:   { type: "integer", example: 2 },
+                                        inactive: { type: "integer", example: 0 },
+                                    },
+                                },
+                                schedules: {
+                                    type: "object",
+                                    properties: {
+                                        upcomingBus:    { type: "integer", example: 8 },
+                                        upcomingFlight: { type: "integer", example: 4 },
+                                        totalUpcoming:  { type: "integer", example: 12 },
+                                    },
+                                },
+                                bookings: {
+                                    type: "object",
+                                    properties: {
+                                        confirmed: { type: "integer", example: 87 },
+                                    },
+                                },
+                                revenue: {
+                                    type: "object",
+                                    properties: {
+                                        total: { type: "number", example: 142500.00, description: "Total revenue from CONFIRMED bookings in INR" },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+
+            }, // ← closes schemas — DO NOT REMOVE
 
             // ── Cookie-based JWT auth (accessToken) ────────────────────────
             securitySchemes: {

@@ -1,6 +1,7 @@
 import express from "express";
-import { getProfile, updateProfile } from "../controllers/user.controller.js";
+import { getProfile, updateProfile, getVendorDashboard } from "../controllers/user.controller.js";
 import { authenticate } from "../../../middleware/auth.middleware.js";
+import { authorize } from "../../../middleware/role.middleware.js";
 import { validate } from "../../../middleware/validate.middleware.js";
 import { updateProfileSchema } from "../validators/user.validator.js";
 
@@ -85,5 +86,37 @@ router.get("/profile", authenticate, getProfile);
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.put("/profile", authenticate, validate(updateProfileSchema), updateProfile);
+
+/**
+ * @swagger
+ * /api/users/vendor/dashboard:
+ *   get:
+ *     summary: Get vendor dashboard summary
+ *     description: >
+ *       Returns a single aggregated response for the vendor dashboard,
+ *       including bus/flight counts, upcoming schedule counts, total
+ *       confirmed bookings, and total revenue. All queries run in parallel
+ *       so this is a single fast call for the frontend.
+ *     tags: [Users]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard summary.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/VendorDashboardResponse'
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Not a vendor or admin
+ */
+router.get(
+    "/vendor/dashboard",
+    authenticate,
+    authorize("vendor", "admin"),
+    getVendorDashboard
+);
 
 export default router;

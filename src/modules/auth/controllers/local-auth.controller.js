@@ -15,9 +15,9 @@ import { ApiError } from "../../../utils/ApiError.js";
 const cookieOptions = (ms) => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  // Browsers require SameSite=None cookies to be Secure. Use 'lax' during
-  // local development so cookies are accepted over http://localhost.
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "none",
+  // SameSite="none" requires HTTPS (Secure flag). During local development
+  // we use "lax" so cookies work over plain http://localhost without errors.
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   maxAge: ms,
 });
 
@@ -35,8 +35,8 @@ export const register = async (req, res, next) => {
     return res.status(201).json({
       success: true,
       message: "User registered successfully",
-      user: { 
-        id: user._id, 
+      user: {
+        id: user._id,
         email: user.email,
         role: user.role,
         name: user.name
@@ -54,22 +54,22 @@ export const register = async (req, res, next) => {
 export const registerVendor = async (req, res, next) => {
   try {
     const vendor = await registerVendorByEmail(req.body);
-    const accessToken  = generateAccessToken(vendor);
+    const accessToken = generateAccessToken(vendor);
     const refreshToken = generateRefreshToken(vendor);
 
     await RefreshToken.create({ userId: vendor._id, token: refreshToken });
 
-    res.cookie("accessToken",  accessToken,  cookieOptions(15 * 60 * 1000));
+    res.cookie("accessToken", accessToken, cookieOptions(15 * 60 * 1000));
     res.cookie("refreshToken", refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000));
 
     return res.status(201).json({
       success: true,
       message: "Vendor registered successfully. Welcome to Payanam!",
       user: {
-        id:          vendor._id,
-        name:        vendor.name,
-        email:       vendor.email,
-        role:        vendor.role,         // "vendor" — useful for frontend redirect
+        id: vendor._id,
+        name: vendor.name,
+        email: vendor.email,
+        role: vendor.role,         // "vendor" — useful for frontend redirect
         companyName: vendor.companyName,
       },
     });
@@ -89,15 +89,22 @@ export const login = async (req, res, next) => {
     res.cookie("accessToken", accessToken, cookieOptions(15 * 60 * 1000));
     res.cookie("refreshToken", refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000));
 
+    // Include `role` so the frontend can redirect:
+    //   role === "vendor" → vendor dashboard
+    //   role === "admin"  → admin panel
+    //   role === "user"   → passenger home
+    // Include `name` and `companyName` so the navbar can display them immediately
+    // without making a separate GET /profile call.
     return res.status(200).json({
       success: true,
       message: "Login successful",
-      user: { 
-        id: user._id, 
+      user: {
+        id: user._id,
+        name: user.name || null,
         email: user.email,
         role: user.role,
-        name: user.name
-      }
+        companyName: user.companyName || null, // only set for vendors
+      },
     });
   } catch (error) {
     return next(error);
@@ -230,7 +237,14 @@ export const verifyMobileOTPController = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: "Mobile verification successful.",
-      user: { id: user._id, mobile: user.phoneNo }
+      user: {
+        id: user._id,
+        name: user.name || null,
+        email: user.email || null,
+        mobile: user.phoneNo,
+        role: user.role,
+        companyName: user.companyName || null,
+      }
     });
   } catch (error) {
     return next(error);
