@@ -58,6 +58,8 @@ const router = express.Router();
  *     description: Route management with airport stops (vendor/admin only)
  *   - name: Flights - Schedules
  *     description: Flight schedule management (vendor/admin only)
+ *   - name: Flights - Reviews
+ *     description: Passenger reviews and ratings (any authenticated user)
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -623,7 +625,7 @@ router.patch(
  *   post:
  *     summary: Add a review for a flight
  *     description: Passengers can rate and review a flight after their completed journey. One review per booking.
- *     tags: [Flights - CRUD]
+ *     tags: [Flights - Reviews]
  *     security:
  *       - cookieAuth: []
  *     parameters:

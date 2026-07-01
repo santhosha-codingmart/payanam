@@ -48,6 +48,8 @@ const router = express.Router();
  *     description: Route management with intermediate stops (vendor/admin only)
  *   - name: Buses - Schedules
  *     description: Trip schedule management (vendor/admin only)
+ *   - name: Buses - Reviews
+ *     description: Passenger reviews and ratings (any authenticated user)
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -667,7 +669,7 @@ router.patch(
  *   post:
  *     summary: Add a review for a bus
  *     description: Users can rate and review a bus after their completed journey.
- *     tags: [Buses - CRUD]
+ *     tags: [Buses - Reviews]
  *     security:
  *       - cookieAuth: []
  *     parameters:
