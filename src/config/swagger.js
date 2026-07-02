@@ -732,6 +732,18 @@ const options = {
                         iataCode: { type: "string", minLength: 3, maxLength: 3, example: "DEL", description: "3-letter IATA code" },
                         city: { type: "string", example: "Delhi" },
                         country: { type: "string", example: "India", default: "India" },
+                        displayText: { type: "string", example: "Delhi (DEL) - Indira Gandhi International Airport" },
+                    },
+                },
+
+                AirportSearchResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        data: {
+                            type: "array",
+                            items: { $ref: "#/components/schemas/AirportItem" },
+                        },
                     },
                 },
 
@@ -1106,7 +1118,7 @@ const options = {
                                         confirmed: { type: "integer", example: 87 },
                                     },
                                 },
-                                revenue: {
+                                 revenue: {
                                     type: "object",
                                     properties: {
                                         total: { type: "number", example: 142500.00, description: "Total revenue from CONFIRMED bookings in INR" },
@@ -1114,6 +1126,125 @@ const options = {
                                 },
                             },
                         },
+                    },
+                },
+
+                // ─────────────────────────────────────────────────────────
+                // HOTELS MODULE
+                // ─────────────────────────────────────────────────────────
+
+                HotelItem: {
+                    type: "object",
+                    properties: {
+                        _id: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0d" },
+                        operatorId: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0d" },
+                        name: { type: "string", example: "Taj Coromandel" },
+                        description: { type: "string", example: "Luxury 5-star hotel in Chennai." },
+                        address: { type: "string", example: "37, Mahatma Gandhi Rd, Nungambakkam" },
+                        city: { type: "string", example: "Chennai" },
+                        state: { type: "string", example: "Tamil Nadu" },
+                        country: { type: "string", example: "India" },
+                        starRating: { type: "integer", example: 5 },
+                        amenities: { type: "array", items: { type: "string" }, example: ["WiFi", "Pool"] },
+                        checkInTime: { type: "string", example: "14:00" },
+                        checkOutTime: { type: "string", example: "11:00" },
+                        status: { type: "string", example: "ACTIVE" },
+                        startingPrice: { type: "number", example: 5000, description: "Only available in search responses" },
+                    },
+                },
+
+                RoomItem: {
+                    type: "object",
+                    properties: {
+                        _id: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0d" },
+                        hotelId: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0d" },
+                        roomType: { type: "string", example: "Deluxe King Room" },
+                        description: { type: "string", example: "Spacious room with city view." },
+                        pricePerNight: { type: "number", example: 5000 },
+                        capacity: {
+                            type: "object",
+                            properties: {
+                                adults: { type: "integer", example: 2 },
+                                children: { type: "integer", example: 1 },
+                            },
+                        },
+                        totalRooms: { type: "integer", example: 10 },
+                        amenities: { type: "array", items: { type: "string" }, example: ["AC", "TV"] },
+                        bedType: { type: "string", example: "King" },
+                        status: { type: "string", example: "AVAILABLE" },
+                    },
+                },
+
+                CreateHotelRequest: {
+                    type: "object",
+                    required: ["name", "description", "address", "city", "state", "starRating"],
+                    properties: {
+                        name: { type: "string", example: "Taj Coromandel" },
+                        description: { type: "string", example: "Luxury 5-star hotel in Chennai." },
+                        address: { type: "string", example: "37, Mahatma Gandhi Rd, Nungambakkam" },
+                        city: { type: "string", example: "Chennai" },
+                        state: { type: "string", example: "Tamil Nadu" },
+                        starRating: { type: "integer", example: 5 },
+                        amenities: { type: "array", items: { type: "string" }, example: ["WiFi", "Pool"] },
+                    },
+                },
+
+                CreateRoomRequest: {
+                    type: "object",
+                    required: ["roomType", "description", "pricePerNight", "capacity", "totalRooms", "bedType"],
+                    properties: {
+                        roomType: { type: "string", example: "Deluxe King Room" },
+                        description: { type: "string", example: "Spacious room with city view." },
+                        pricePerNight: { type: "number", example: 5000 },
+                        capacity: {
+                            type: "object",
+                            properties: {
+                                adults: { type: "integer", example: 2 },
+                                children: { type: "integer", example: 1 },
+                            },
+                        },
+                        totalRooms: { type: "integer", example: 10 },
+                        bedType: { type: "string", example: "King" },
+                        amenities: { type: "array", items: { type: "string" }, example: ["AC", "TV"] },
+                    },
+                },
+
+                CreateHotelBookingRequest: {
+                    type: "object",
+                    required: ["hotelId", "roomId", "checkInDate", "checkOutDate", "numRooms", "totalGuests", "guestDetails"],
+                    properties: {
+                        hotelId: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0d" },
+                        roomId: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0e" },
+                        checkInDate: { type: "string", format: "date", example: "2026-07-10" },
+                        checkOutDate: { type: "string", format: "date", example: "2026-07-12" },
+                        numRooms: { type: "integer", example: 1 },
+                        totalGuests: {
+                            type: "object",
+                            properties: {
+                                adults: { type: "integer", example: 2 },
+                                children: { type: "integer", example: 0 },
+                            },
+                        },
+                        guestDetails: {
+                            type: "array",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    name: { type: "string", example: "John Doe" },
+                                    age: { type: "integer", example: 30 },
+                                },
+                            },
+                        },
+                    },
+                },
+
+                CreateHotelReviewRequest: {
+                    type: "object",
+                    required: ["bookingId", "rating", "comment"],
+                    properties: {
+                        bookingId: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0d" },
+                        rating: { type: "integer", minimum: 1, maximum: 5, example: 5 },
+                        comment: { type: "string", example: "Amazing stay, highly recommended!" },
                     },
                 },
 

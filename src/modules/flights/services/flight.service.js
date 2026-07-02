@@ -11,6 +11,8 @@ import { FlightReview } from "../models/flightReview.model.js";
 import { ApiError } from "../../../utils/ApiError.js";
 import redis from "../../../config/redis.js";
 import Booking from "../../bookings/models/booking.model.js";
+import { bulkUpsertCities } from "../../places/services/city.service.js";
+import { bulkUpsertAirports } from "../services/airport.service.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FLIGHT CRUD (Vendor-only)
@@ -137,6 +139,29 @@ export const createFlightRouteService = async (operatorId, routeData) => {
     routeData.stops.sort((a, b) => a.order - b.order);
 
     const route = await FlightRoute.create(routeData);
+
+    // 4. ── AUTO-REGISTER CITIES & AIRPORTS ──
+    // We register the city in the Places module, and the airport in the Flights module.
+    const citiesToUpsert = [
+        { name: routeData.source.city, state: routeData.source.country || "India" },
+        { name: routeData.destination.city, state: routeData.destination.country || "India" },
+        ...routeData.stops.map((stop) => ({ name: stop.city, state: stop.country || "India" })),
+    ];
+
+    const airportsToUpsert = [
+        { iataCode: routeData.source.iataCode, name: routeData.source.name, city: routeData.source.city, country: routeData.source.country },
+        { iataCode: routeData.destination.iataCode, name: routeData.destination.name, city: routeData.destination.city, country: routeData.destination.country },
+        ...routeData.stops.map((stop) => ({ iataCode: stop.iataCode, name: stop.name, city: stop.city, country: stop.country })),
+    ];
+
+    bulkUpsertCities(citiesToUpsert).catch((err) =>
+        console.error("[FlightService] Failed to auto-register cities for route:", err.message)
+    );
+
+    bulkUpsertAirports(airportsToUpsert).catch((err) =>
+        console.error("[FlightService] Failed to auto-register airports for route:", err.message)
+    );
+
     return route;
 };
 

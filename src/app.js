@@ -4,8 +4,10 @@ import router from "./modules/auth/routes/local-auth.routes.js";
 import userRouter from "./modules/users/routes/user.routes.js";
 import busRouter from "./modules/bus/routes/bus.route.js";
 import flightRouter from "./modules/flights/routes/flight.route.js";
+import airportRouter from "./modules/flights/routes/airport.routes.js";
 import bookingRouter from "./modules/bookings/routes/booking.routes.js";
 import placeRouter from "./modules/places/routes/place.routes.js";
+import hotelRouter from "./modules/hotels/routes/hotel.routes.js";
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middleware/error.middleware.js";
 import swaggerSpec from "./config/swagger.js";
@@ -50,8 +52,10 @@ app.use("/api/auth", router);
 app.use("/api/users", userRouter);
 app.use("/api/v1/buses", busRouter);
 app.use("/api/v1/flights", flightRouter);
+app.use("/api/v1/airports", airportRouter);
 app.use("/api/v1/bookings", bookingRouter);
 app.use("/api/v1/places", placeRouter);
+app.use("/api/v1/hotels", hotelRouter);
 
 // ── Global Error Handler (must come AFTER all routes) ─────────────────────────
 app.use(errorHandler);

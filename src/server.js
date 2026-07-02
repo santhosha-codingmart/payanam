@@ -1,9 +1,9 @@
 import app from "./app.js";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
-// Simply importing our redis file will execute the connection code inside it
 import "./config/redis.js";
 import { bulkUpsertCities, initCityCache } from "./modules/places/services/city.service.js";
+import { bulkUpsertAirports, initAirportCache } from "./modules/flights/services/airport.service.js";
 import { createRequire } from "module";
 
 dotenv.config();
@@ -15,6 +15,7 @@ const require = createRequire(import.meta.url);
 
 async function start() {
     await connectDB();
+    await initAirportCache();
 
     // ── Seed cities from JSON on first boot ──────────────────────────────────
     // The cities.json file contains 1200+ Indian cities fetched from an open
@@ -154,10 +155,17 @@ async function start() {
         await bulkUpsertCities(citiesPayload);
         console.log(`🌆 Cities seeded successfully from JSON`);
     } catch (err) {
-        // Non-fatal: if seeding fails, the cache will still be initialized
-        // from whatever is already in MongoDB.
         console.error("[Startup] City seed warning:", err.message);
         await initCityCache();
+    }
+
+    try {
+        const airportsJson = require("./modules/flights/data/airports.json");
+        await bulkUpsertAirports(airportsJson);
+        console.log(`✈️  Airports seeded successfully from JSON`);
+    } catch (err) {
+        console.error("[Startup] Airport seed warning:", err.message);
+        await initAirportCache();
     }
 
     app.listen(process.env.PORT, () => {
