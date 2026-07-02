@@ -73,7 +73,7 @@ export const getVendorBusesService = async (operatorId, filters = {}) => {
     // to find matching bus IDs, then add those IDs to our Bus query.
     if (from || to) {
         const routeQuery = { status: "ACTIVE" };
-        
+
         if (from && to) {
             const fromRegex = new RegExp(`^${from}$`, "i");
             const toRegex = new RegExp(`^${to}$`, "i");
@@ -92,37 +92,37 @@ export const getVendorBusesService = async (operatorId, filters = {}) => {
                 },
             ];
         } else if (from) {
-             const fromRegex = new RegExp(`^${from}$`, "i");
-             routeQuery.$or = [
-                 { "source.city": fromRegex },
-                 { "stops.city": fromRegex },
-             ];
+            const fromRegex = new RegExp(`^${from}$`, "i");
+            routeQuery.$or = [
+                { "source.city": fromRegex },
+                { "stops.city": fromRegex },
+            ];
         } else if (to) {
-             const toRegex = new RegExp(`^${to}$`, "i");
-             routeQuery.$or = [
-                 { "destination.city": toRegex },
-                 { "stops.city": toRegex },
-             ];
+            const toRegex = new RegExp(`^${to}$`, "i");
+            routeQuery.$or = [
+                { "destination.city": toRegex },
+                { "stops.city": toRegex },
+            ];
         }
 
         const matchingRoutes = await Route.find(routeQuery).select("busId stops");
         const validBusIds = new Set();
-        
+
         // If both locations are provided, enforce direction (from comes before to)
         if (from && to) {
-             const fromRegex = new RegExp(`^${from}$`, "i");
-             const toRegex = new RegExp(`^${to}$`, "i");
-             for (const route of matchingRoutes) {
-                 const fromStop = route.stops.find(s => fromRegex.test(s.city));
-                 const toStop = route.stops.find(s => toRegex.test(s.city));
-                 if (fromStop && toStop && fromStop.order < toStop.order) {
-                     validBusIds.add(route.busId.toString());
-                 }
-             }
+            const fromRegex = new RegExp(`^${from}$`, "i");
+            const toRegex = new RegExp(`^${to}$`, "i");
+            for (const route of matchingRoutes) {
+                const fromStop = route.stops.find(s => fromRegex.test(s.city));
+                const toStop = route.stops.find(s => toRegex.test(s.city));
+                if (fromStop && toStop && fromStop.order < toStop.order) {
+                    validBusIds.add(route.busId.toString());
+                }
+            }
         } else {
-             for (const route of matchingRoutes) {
-                 validBusIds.add(route.busId.toString());
-             }
+            for (const route of matchingRoutes) {
+                validBusIds.add(route.busId.toString());
+            }
         }
 
         // Add the matching bus IDs to the main bus query
@@ -394,7 +394,7 @@ export const getVendorSchedulesService = async (operatorId) => {
         .populate({ path: "routeId", select: "source destination" })
         .select("-seats") // Exclude the huge seats array for performance
         .sort({ departureDate: 1, departureTime: 1 });
-        
+
     return schedules;
 };
 
@@ -756,10 +756,10 @@ export const cancelScheduleService = async (operatorId, scheduleId) => {
     // 4. Cancel each booking with a full refund (vendor-initiated = 100% refund)
     const cancelledCount = affectedBookings.length;
     for (const booking of affectedBookings) {
-        booking.bookingStatus  = "CANCELLED";
-        booking.paymentStatus  = "REFUNDED";
-        booking.refundAmount   = booking.totalFare; // 100% refund
-        booking.cancelledAt    = new Date();
+        booking.bookingStatus = "CANCELLED";
+        booking.paymentStatus = "REFUNDED";
+        booking.refundAmount = booking.totalFare; // 100% refund
+        booking.cancelledAt = new Date();
         await booking.save();
     }
 
