@@ -45,7 +45,7 @@ const iataCode = z.string().regex(
 // E.g., { seatNumber: "3A", cabinClass: "ECONOMY", seatType: "window", row: 3, column: "A" }
 const seatLayoutItemSchema = z.object({
     seatNumber: z.string().min(1, "Seat number is required"),
-    cabinClass: z.enum(["ECONOMY", "BUSINESS", "FIRST"]).optional().default("ECONOMY"),
+    cabinClass: z.enum(["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"]).optional().default("ECONOMY"),
     seatType: z.enum(["window", "aisle", "middle"]).optional().default("aisle"),
     row: z.number().int().min(1, "Row must be a positive integer"),
     column: z.string().min(1).max(1, "Column must be a single letter (A-F)"),
@@ -97,32 +97,46 @@ export const createFlightSchema = z.object({
     body: z.object({
         operatorName: z.string().min(2, "Operator name required").max(100),
         airlineName: z.string().min(2, "Airline name required").max(100),
-        flightNumber: z.string().min(2, "Flight number required").max(20),
-        registrationNumber: z.string().min(4, "Registration number required").max(20),
+        manufacturer: z.enum([
+            "AIRBUS", "BOEING", "ATR", "EMBRAER", "BOMBARDIER", "DE_HAVILLAND"
+        ]),
+        
+        aircraftModel: z.string().min(2, "Aircraft model required").max(50),
 
         // Must be one of the defined aircraft types
         aircraftType: z.enum([
-            "AIRBUS_A320", "AIRBUS_A321", "BOEING_737",
-            "BOEING_777", "BOEING_787", "ATR_72", "EMBRAER_E175",
+            "AIRBUS_A220", "AIRBUS_A319", "AIRBUS_A320", "AIRBUS_A320NEO",
+            "AIRBUS_A321", "AIRBUS_A321NEO", "AIRBUS_A330", "AIRBUS_A330NEO",
+            "AIRBUS_A340", "AIRBUS_A350", "AIRBUS_A380",
+            "BOEING_737_700", "BOEING_737_800", "BOEING_737_MAX8",
+            "BOEING_747", "BOEING_757", "BOEING_767", "BOEING_777_200",
+            "BOEING_777_300ER", "BOEING_777X", "BOEING_787_8", "BOEING_787_9", "BOEING_787_10",
+            "ATR_42", "ATR_72",
+            "EMBRAER_E170", "EMBRAER_E175", "EMBRAER_E190", "EMBRAER_E195",
+            "EMBRAER_E190_E2", "EMBRAER_E195_E2",
+            "CRJ700", "CRJ900", "CRJ1000",
+            "DASH8_Q400"
         ]),
 
         // The cabin configuration of this aircraft
-        classType: z.enum([
-            "ECONOMY", "BUSINESS", "FIRST",
-            "ECONOMY_BUSINESS", "ECONOMY_FIRST", "ALL_CLASSES",
-        ]),
+        cabinClasses: z.array(z.enum([
+            "ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"
+        ])).min(1, "At least one cabin class must be provided"),
 
         totalSeats: z.number().int().min(1).max(500),
         economySeats: z.number().int().min(0).optional(),
+        premiumEconomySeats: z.number().int().min(0).optional(),
         businessSeats: z.number().int().min(0).optional(),
         firstClassSeats: z.number().int().min(0).optional(),
 
-        hasBusinessClass: z.boolean().optional(),
-        hasFirstClass: z.boolean().optional(),
-
         amenities: z.array(z.enum([
-            "WiFi", "Meal", "Snack", "Entertainment",
-            "Power Outlet", "USB Charging", "Extra Legroom", "Priority Boarding",
+            "WiFi", "Meal", "Snack", "Entertainment", 
+            "Power Outlet", "USB Charging", "Bluetooth Audio", 
+            "Streaming Entertainment", "Blanket", "Pillow", 
+            "Alcohol", "Vegetarian Meal", "Vegan Meal", 
+            "Kosher Meal", "Halal Meal", "Extra Legroom", 
+            "Priority Boarding", "Wheelchair Assistance", 
+            "Pet Friendly", "Infant Bassinet", "Lounge Access"
         ])).optional().default([]),
 
         // Aircraft MUST have a seat layout — used to create the seat snapshot
@@ -140,20 +154,36 @@ export const updateFlightSchema = z.object({
     body: z.object({
         operatorName: z.string().min(2).max(100).optional(),
         airlineName: z.string().min(2).max(100).optional(),
-        flightNumber: z.string().min(2).max(20).optional(),
         registrationNumber: z.string().min(4).max(20).optional(),
+        manufacturer: z.enum([
+            "AIRBUS", "BOEING", "ATR", "EMBRAER", "BOMBARDIER", "DE_HAVILLAND"
+        ]).optional(),
+        aircraftModel: z.string().min(2).max(50).optional(),
         aircraftType: z.enum([
-            "AIRBUS_A320", "AIRBUS_A321", "BOEING_737",
-            "BOEING_777", "BOEING_787", "ATR_72", "EMBRAER_E175",
+            "AIRBUS_A220", "AIRBUS_A319", "AIRBUS_A320", "AIRBUS_A320NEO",
+            "AIRBUS_A321", "AIRBUS_A321NEO", "AIRBUS_A330", "AIRBUS_A330NEO",
+            "AIRBUS_A340", "AIRBUS_A350", "AIRBUS_A380",
+            "BOEING_737_700", "BOEING_737_800", "BOEING_737_MAX8",
+            "BOEING_747", "BOEING_757", "BOEING_767", "BOEING_777_200",
+            "BOEING_777_300ER", "BOEING_777X", "BOEING_787_8", "BOEING_787_9", "BOEING_787_10",
+            "ATR_42", "ATR_72",
+            "EMBRAER_E170", "EMBRAER_E175", "EMBRAER_E190", "EMBRAER_E195",
+            "EMBRAER_E190_E2", "EMBRAER_E195_E2",
+            "CRJ700", "CRJ900", "CRJ1000",
+            "DASH8_Q400"
         ]).optional(),
-        classType: z.enum([
-            "ECONOMY", "BUSINESS", "FIRST",
-            "ECONOMY_BUSINESS", "ECONOMY_FIRST", "ALL_CLASSES",
-        ]).optional(),
+        cabinClasses: z.array(z.enum([
+            "ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"
+        ])).optional(),
         totalSeats: z.number().int().min(1).max(500).optional(),
         amenities: z.array(z.enum([
-            "WiFi", "Meal", "Snack", "Entertainment",
-            "Power Outlet", "USB Charging", "Extra Legroom", "Priority Boarding",
+            "WiFi", "Meal", "Snack", "Entertainment", 
+            "Power Outlet", "USB Charging", "Bluetooth Audio", 
+            "Streaming Entertainment", "Blanket", "Pillow", 
+            "Alcohol", "Vegetarian Meal", "Vegan Meal", 
+            "Kosher Meal", "Halal Meal", "Extra Legroom", 
+            "Priority Boarding", "Wheelchair Assistance", 
+            "Pet Friendly", "Infant Bassinet", "Lounge Access"
         ])).optional(),
         seatLayout: z.array(seatLayoutItemSchema).min(1).optional(),
         status: z.enum(["ACTIVE", "INACTIVE", "MAINTENANCE"]).optional(),
@@ -197,6 +227,7 @@ export const createFlightScheduleSchema = z.object({
     body: z.object({
         routeId: objectId,   // Which route does this schedule follow?
         flightId: objectId,  // Which aircraft is flying?
+        flightNumber: z.string().min(2, "Flight number is required").max(20),
 
         // Travel dates in YYYY-MM-DD format
         departureDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),

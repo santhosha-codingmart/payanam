@@ -386,6 +386,18 @@ export const getScheduleSeatsService = async (scheduleId) => {
     };
 };
 
+export const getVendorSchedulesService = async (operatorId) => {
+    // Return all schedules belonging to the vendor, sorted by departure date.
+    // Populate the busId and routeId to provide meaningful data.
+    const schedules = await Schedule.find({ operatorId })
+        .populate({ path: "busId", select: "busName busNumber busType" })
+        .populate({ path: "routeId", select: "source destination" })
+        .select("-seats") // Exclude the huge seats array for performance
+        .sort({ departureDate: 1, departureTime: 1 });
+        
+    return schedules;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SEARCH (Public — No auth required)
 // ─────────────────────────────────────────────────────────────────────────────

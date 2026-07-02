@@ -144,6 +144,21 @@ export const createSchedule = async (req, res, next) => {
     }
 };
 
+export const getVendorSchedules = async (req, res, next) => {
+    try {
+        const schedules = await busService.getVendorSchedulesService(req.user._id);
+
+        return res.status(200).json({
+            success: true,
+            message: "Schedules fetched successfully.",
+            count: schedules.length,
+            data: schedules,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Gets the full seat map for the frontend to render the bus layout
 export const getScheduleSeats = async (req, res, next) => {
     try {

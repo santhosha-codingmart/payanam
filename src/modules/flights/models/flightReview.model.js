@@ -20,7 +20,7 @@ const flightReviewSchema = new mongoose.Schema(
         // across multiple trips. "IndiGo 6E-204" gets one combined rating.
         flightId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: "Flight",
+            ref: "Aircraft",
             required: true,
             index: true, // Makes queries like "get all reviews for flight X" fast
         },

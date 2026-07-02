@@ -1,4 +1,5 @@
 import * as hotelService from "../services/hotel.service.js";
+import { uploadFileToS3 } from "../../../utils/s3.service.js";
 
 // ── VENDOR OPERATIONS ────────────────────────────────────────────────────────
 
@@ -6,6 +7,19 @@ export const createHotel = async (req, res, next) => {
     try {
         const operatorId = req.user._id; 
         const hotelData = req.body;
+
+        // If files were uploaded, send them to S3
+        if (req.files && req.files.length > 0) {
+            const uploadPromises = req.files.map((file) => 
+                uploadFileToS3(file.buffer, file.originalname, file.mimetype, "hotels")
+            );
+            const imageUrls = await Promise.all(uploadPromises);
+            
+            // If there were existing string URLs in req.body.images, we merge them
+            const existingImages = Array.isArray(hotelData.images) ? hotelData.images : 
+                                   (hotelData.images ? [hotelData.images] : []);
+            hotelData.images = [...existingImages, ...imageUrls];
+        }
 
         const hotel = await hotelService.createHotelService(operatorId, hotelData);
         res.status(201).json({ success: true, data: hotel, message: "Hotel created successfully." });
@@ -39,6 +53,18 @@ export const updateHotel = async (req, res, next) => {
         const { id } = req.params;
         const operatorId = req.user._id;
         const updateData = req.body;
+
+        // If files were uploaded, send them to S3
+        if (req.files && req.files.length > 0) {
+            const uploadPromises = req.files.map((file) => 
+                uploadFileToS3(file.buffer, file.originalname, file.mimetype, "hotels")
+            );
+            const imageUrls = await Promise.all(uploadPromises);
+            
+            const existingImages = Array.isArray(updateData.images) ? updateData.images : 
+                                   (updateData.images ? [updateData.images] : []);
+            updateData.images = [...existingImages, ...imageUrls];
+        }
 
         const hotel = await hotelService.updateHotelService(id, operatorId, updateData);
         res.status(200).json({ success: true, data: hotel, message: "Hotel updated successfully." });

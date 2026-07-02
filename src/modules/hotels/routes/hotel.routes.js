@@ -2,6 +2,7 @@ import express from "express";
 import * as hotelController from "../controllers/hotel.controller.js";
 import { authenticate } from "../../../middleware/auth.middleware.js";
 import { authorize } from "../../../middleware/role.middleware.js";
+import { upload } from "../../../middleware/upload.middleware.js";
 
 const router = express.Router();
 
@@ -291,7 +292,7 @@ vendorAuth.use(authorize("vendor", "admin"));
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             $ref: "#/components/schemas/CreateHotelRequest"
  *     responses:
@@ -305,7 +306,7 @@ vendorAuth.use(authorize("vendor", "admin"));
  *                 success: { type: "boolean" }
  *                 data: { $ref: "#/components/schemas/HotelItem" }
  */
-vendorAuth.post("/", hotelController.createHotel);
+vendorAuth.post("/", upload.array("images", 10), hotelController.createHotel);
 
 /**
  * @swagger
@@ -338,16 +339,21 @@ vendorAuth.get("/", hotelController.getVendorHotels);
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
  *               status: { type: string, example: "INACTIVE" }
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
  *     responses:
  *       200:
  *         description: Hotel updated successfully
  */
-vendorAuth.put("/:id", hotelController.updateHotel);
+vendorAuth.put("/:id", upload.array("images", 10), hotelController.updateHotel);
 
 /**
  * @swagger

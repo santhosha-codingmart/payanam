@@ -4,7 +4,7 @@
 // Services talk to MongoDB, enforce business rules, and throw ApiErrors.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { Flight } from "../models/flight.model.js";
+import { Aircraft as Flight } from "../models/aircraft.model.js";
 import { FlightRoute } from "../models/flightRoute.model.js";
 import { FlightSchedule } from "../models/flightSchedule.model.js";
 import { FlightReview } from "../models/flightReview.model.js";
@@ -21,15 +21,7 @@ import { bulkUpsertAirports } from "../services/airport.service.js";
 // Creates a new aircraft record for the given vendor.
 // Enforces uniqueness on both flightNumber and registrationNumber.
 export const createFlightService = async (operatorId, payload) => {
-    // 1. Check for duplicate flight number (globally unique like a bus number)
-    const existingFlight = await Flight.findOne({
-        flightNumber: payload.flightNumber.toUpperCase(),
-    });
-    if (existingFlight) {
-        throw new ApiError(409, "A flight with this flight number already exists.");
-    }
-
-    // 2. Check for duplicate aircraft registration (tail number must be unique)
+    // 1. Check for duplicate aircraft registration (tail number must be unique)
     const existingReg = await Flight.findOne({
         registrationNumber: payload.registrationNumber.toUpperCase(),
     });
@@ -37,12 +29,10 @@ export const createFlightService = async (operatorId, payload) => {
         throw new ApiError(409, "A flight with this registration number already exists.");
     }
 
-    // 3. Create the flight, injecting operatorId from the JWT token — the vendor
-    //    who made the HTTP request is always set as the owner.
+    // 2. Create the flight, injecting operatorId from the JWT token
     const flight = await Flight.create({
         ...payload,
         operatorId,
-        flightNumber: payload.flightNumber.toUpperCase(),
         registrationNumber: payload.registrationNumber.toUpperCase(),
     });
 
@@ -73,17 +63,7 @@ export const updateFlightService = async (flightId, operatorId, updateData) => {
         throw new ApiError(403, "You can only update your own flights.");
     }
 
-    // If changing the flight number, ensure no OTHER flight already has it
-    if (updateData.flightNumber) {
-        updateData.flightNumber = updateData.flightNumber.toUpperCase();
-        const dup = await Flight.findOne({
-            flightNumber: updateData.flightNumber,
-            _id: { $ne: flightId }, // $ne = "not equal" — exclude current flight
-        });
-        if (dup) throw new ApiError(409, "Another flight with this flight number already exists.");
-    }
-
-    // Same duplicate check for registration number
+    // Duplicate check for registration number
     if (updateData.registrationNumber) {
         updateData.registrationNumber = updateData.registrationNumber.toUpperCase();
         const dup = await Flight.findOne({
@@ -233,6 +213,7 @@ export const createFlightScheduleService = async (operatorId, scheduleData) => {
     const schedule = await FlightSchedule.create({
         routeId,
         flightId,
+        flightNumber: scheduleData.flightNumber,
         operatorId,
         departureDate: new Date(departureDate),
         arrivalDate,
@@ -256,6 +237,18 @@ export const createFlightScheduleService = async (operatorId, scheduleData) => {
     return schedule;
 };
 
+export const getVendorFlightSchedulesService = async (operatorId) => {
+    // Return all flight schedules belonging to the vendor, sorted by departure date.
+    // Populate the flightId and routeId to provide meaningful data.
+    const schedules = await FlightSchedule.find({ operatorId })
+        .populate({ path: "flightId", select: "airlineName registrationNumber aircraftModel" })
+        .populate({ path: "routeId", select: "source destination" })
+        .select("-seats") // Exclude the huge seats array for performance
+        .sort({ departureDate: 1, departureTime: 1 });
+        
+    return schedules;
+};
+
 // Returns full seat map + flight/route details for the frontend to render.
 export const getFlightScheduleSeatsService = async (scheduleId) => {
     // .populate() replaces the stored ObjectId with the full referenced document.
@@ -263,7 +256,7 @@ export const getFlightScheduleSeatsService = async (scheduleId) => {
     const schedule = await FlightSchedule.findById(scheduleId)
         .populate({
             path: "flightId",
-            select: "airlineName flightNumber aircraftType classType amenities averageRating photos operatorName totalSeats",
+            select: "airlineName aircraftType aircraftModel cabinClasses amenities averageRating photos operatorName totalSeats",
         })
         .populate({
             path: "routeId",
@@ -379,16 +372,15 @@ export const searchFlightsService = async (from, to, date, filters = {}) => {
     // ── STEP 4: Apply flight-level filters ────────────────────────────────
     const flightQuery = {};
     if (filters.aircraftType) flightQuery.aircraftType = filters.aircraftType;
-    if (filters.cabinClass) flightQuery.classType = { $regex: filters.cabinClass, $options: "i" };
-    if (filters.hasBusinessClass !== undefined) {
-        flightQuery.hasBusinessClass = filters.hasBusinessClass === "true";
+    if (filters.cabinClass) {
+        flightQuery.cabinClasses = { $in: [filters.cabinClass.toUpperCase()] };
     }
 
     // ── STEP 5: Execute query with DB-level joins (populate) ──────────────
     let schedules = await FlightSchedule.find(scheduleQuery)
         .populate({
             path: "flightId",
-            select: "airlineName flightNumber aircraftType classType amenities hasBusinessClass hasFirstClass averageRating totalRatings photos operatorName totalSeats",
+            select: "airlineName aircraftType aircraftModel cabinClasses amenities averageRating totalRatings photos operatorName totalSeats",
             // `match` acts like an inner join — if the flight doesn't satisfy
             // the filter, Mongoose sets flightId to null for that schedule.
             match: Object.keys(flightQuery).length > 0 ? flightQuery : undefined,
@@ -430,11 +422,10 @@ export const searchFlightsService = async (from, to, date, filters = {}) => {
             flight: {
                 id: s.flightId?._id,
                 airlineName: s.flightId?.airlineName,
-                flightNumber: s.flightId?.flightNumber,
+                flightNumber: s.flightNumber,
                 aircraftType: s.flightId?.aircraftType,
-                classType: s.flightId?.classType,
-                hasBusinessClass: s.flightId?.hasBusinessClass,
-                hasFirstClass: s.flightId?.hasFirstClass,
+                aircraftModel: s.flightId?.aircraftModel,
+                cabinClasses: s.flightId?.cabinClasses || [],
                 amenities: s.flightId?.amenities || [],
                 rating: s.flightId?.averageRating || 0,
             },

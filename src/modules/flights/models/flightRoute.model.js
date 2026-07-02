@@ -49,7 +49,7 @@ const flightRouteSchema = new mongoose.Schema(
         // This links the route back to the Flight model (and transitively to the vendor).
         flightId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: "Flight",
+            ref: "Aircraft",
             required: true,
             index: true, // Speeds up: "find all routes for flight X"
         },

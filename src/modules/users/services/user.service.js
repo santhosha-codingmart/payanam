@@ -2,7 +2,7 @@ import User from "../models/user.model.js";
 import { ApiError } from "../../../utils/ApiError.js";
 import { Bus } from "../../bus/models/bus.model.js";
 import { Schedule } from "../../bus/models/schedule.model.js";
-import { Flight } from "../../flights/models/flight.model.js";
+import { Aircraft as Flight } from "../../flights/models/aircraft.model.js";
 import { FlightSchedule } from "../../flights/models/flightSchedule.model.js";
 import Booking from "../../bookings/models/booking.model.js";
 

@@ -13,6 +13,7 @@ import {
     blockSeats,
     addReview,
     cancelSchedule,
+    getVendorSchedules,
 } from "../controllers/bus.controller.js";
 import { authenticate } from "../../../middleware/auth.middleware.js";
 import { authorize } from "../../../middleware/role.middleware.js";
@@ -539,6 +540,29 @@ router.post(
     authorize("vendor", "admin"),
     validate(createScheduleSchema),
     createSchedule
+);
+
+/**
+ * @swagger
+ * /api/v1/buses/schedules:
+ *   get:
+ *     summary: List all schedules for the logged-in vendor
+ *     tags: [Buses - Schedules]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: List of schedules for the vendor.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ScheduleListResponse'
+ */
+router.get(
+    "/schedules",
+    authenticate,
+    authorize("vendor", "admin"),
+    getVendorSchedules
 );
 
 // ─────────────────────────────────────────────────────────────────────────────

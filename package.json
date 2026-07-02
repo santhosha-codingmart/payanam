@@ -8,11 +8,13 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "seed:bus": "node src/seeds/bus-seed.js"
+    "seed:bus": "node src/seeds/bus-seed.js",
+    "seed:flight": "node src/seeds/flight-seed.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1078.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -22,11 +24,13 @@
     "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.6.3",
+    "multer": "^2.2.0",
     "nodemailer": "^9.0.1",
     "nodemon": "^3.1.14",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
     "twilio": "^6.0.2",
+    "uuid": "^14.0.1",
     "zod": "^4.4.3"
   }
 }

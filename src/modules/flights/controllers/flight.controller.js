@@ -152,6 +152,21 @@ export const createFlightSchedule = async (req, res, next) => {
     }
 };
 
+export const getVendorFlightSchedules = async (req, res, next) => {
+    try {
+        const schedules = await flightService.getVendorFlightSchedulesService(req.user._id);
+
+        return res.status(200).json({
+            success: true,
+            message: "Schedules fetched successfully.",
+            count: schedules.length,
+            data: schedules,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // GET /api/v1/flights/schedules/:scheduleId/seats — View the seat map for a trip
 export const getFlightScheduleSeats = async (req, res, next) => {
     try {

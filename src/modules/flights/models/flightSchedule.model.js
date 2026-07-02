@@ -34,9 +34,17 @@ const flightScheduleSchema = new mongoose.Schema(
         // Which physical aircraft is flying this schedule?
         flightId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: "Flight",
+            ref: "Aircraft",
             required: true,
             index: true,
+        },
+
+        // Flight number for this specific schedule (e.g. "6E204")
+        flightNumber: {
+            type: String,
+            required: true,
+            uppercase: true,
+            trim: true,
         },
 
         // Which vendor (airline) is operating this flight?
@@ -111,7 +119,7 @@ const flightScheduleSchema = new mongoose.Schema(
                 // Cabin class this seat belongs to
                 cabinClass: {
                     type: String,
-                    enum: ["ECONOMY", "BUSINESS", "FIRST"],
+                    enum: ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"],
                     default: "ECONOMY",
                 },
 
@@ -125,8 +133,8 @@ const flightScheduleSchema = new mongoose.Schema(
                 // Physical row number (for UI rendering)
                 row: { type: Number },
 
-                // Column letter (e.g., "A", "B", "C")
-                column: { type: String },
+                // Column layout
+                column: { type: Number },
 
                 // Does this seat have extra legroom?
                 isExtraLegroom: { type: Boolean, default: false },

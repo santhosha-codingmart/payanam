@@ -515,6 +515,15 @@ const options = {
                     },
                 },
 
+                ScheduleListResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        count: { type: "integer", example: 10 },
+                        data: { type: "array", items: { type: "object" } },
+                    },
+                },
+
                 SeatLayoutResponse: {
                     type: "object",
                     properties: {
@@ -768,34 +777,48 @@ const options = {
 
                 CreateFlightRequest: {
                     type: "object",
-                    required: ["operatorName", "airlineName", "flightNumber", "registrationNumber", "aircraftType", "classType", "totalSeats", "seatLayout"],
+                    required: ["operatorName", "airlineName", "registrationNumber", "manufacturer", "aircraftModel", "aircraftType", "cabinClasses", "totalSeats", "seatLayout"],
                     properties: {
                         operatorName: { type: "string", example: "IndiGo Airlines", description: "Operator/company display name" },
                         airlineName: { type: "string", example: "IndiGo", description: "Short airline brand name" },
-                        flightNumber: { type: "string", example: "6E-204", description: "IATA flight number. Auto-uppercased." },
                         registrationNumber: { type: "string", example: "VT-IGP", description: "Government-issued aircraft tail number. Must be globally unique." },
+                        manufacturer: {
+                            type: "string",
+                            enum: ["AIRBUS", "BOEING", "ATR", "EMBRAER", "BOMBARDIER", "DE_HAVILLAND"],
+                            example: "AIRBUS",
+                        },
+                        aircraftModel: { type: "string", example: "A320neo" },
                         aircraftType: {
                             type: "string",
-                            enum: ["AIRBUS_A320", "AIRBUS_A321", "BOEING_737", "BOEING_777", "BOEING_787", "ATR_72", "EMBRAER_E175"],
-                            example: "AIRBUS_A320",
+                            enum: ["AIRBUS_A320NEO", "BOEING_737_MAX8", "ATR_72"],
+                            example: "AIRBUS_A320NEO",
                         },
-                        classType: {
-                            type: "string",
-                            enum: ["ECONOMY", "BUSINESS", "FIRST", "ECONOMY_BUSINESS", "ECONOMY_FIRST", "ALL_CLASSES"],
-                            example: "ECONOMY",
-                            description: "Cabin configuration of this aircraft",
+                        cabinClasses: {
+                            type: "array",
+                            items: {
+                                type: "string",
+                                enum: ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"],
+                            },
+                            example: ["ECONOMY", "BUSINESS"],
                         },
                         totalSeats: { type: "integer", example: 180, description: "Total bookable seats across all cabin classes" },
                         economySeats: { type: "integer", example: 162 },
+                        premiumEconomySeats: { type: "integer", example: 0 },
                         businessSeats: { type: "integer", example: 18 },
                         firstClassSeats: { type: "integer", example: 0 },
-                        hasBusinessClass: { type: "boolean", example: false },
-                        hasFirstClass: { type: "boolean", example: false },
                         amenities: {
                             type: "array",
                             items: {
                                 type: "string",
-                                enum: ["WiFi", "Meal", "Snack", "Entertainment", "Power Outlet", "USB Charging", "Extra Legroom", "Priority Boarding"],
+                                enum: [
+                                    "WiFi", "Meal", "Snack", "Entertainment", 
+                                    "Power Outlet", "USB Charging", "Bluetooth Audio", 
+                                    "Streaming Entertainment", "Blanket", "Pillow", 
+                                    "Alcohol", "Vegetarian Meal", "Vegan Meal", 
+                                    "Kosher Meal", "Halal Meal", "Extra Legroom", 
+                                    "Priority Boarding", "Wheelchair Assistance", 
+                                    "Pet Friendly", "Infant Bassinet", "Lounge Access"
+                                ],
                             },
                             example: ["Meal", "USB Charging"],
                         },
@@ -812,14 +835,17 @@ const options = {
                     description: "All fields optional — only the provided fields are updated (PATCH semantics).",
                     properties: {
                         airlineName: { type: "string", example: "IndiGo Express" },
-                        flightNumber: { type: "string", example: "6E-205" },
                         registrationNumber: { type: "string", example: "VT-IGA" },
-                        aircraftType: {
-                            type: "string",
-                            enum: ["AIRBUS_A320", "AIRBUS_A321", "BOEING_737", "BOEING_777", "BOEING_787", "ATR_72", "EMBRAER_E175"],
+                        manufacturer: { type: "string", example: "AIRBUS" },
+                        aircraftModel: { type: "string", example: "A321neo" },
+                        aircraftType: { type: "string", example: "AIRBUS_A321NEO" },
+                        cabinClasses: {
+                            type: "array",
+                            items: { type: "string" },
+                            example: ["ECONOMY"],
                         },
                         amenities: { type: "array", items: { type: "string" } },
-                        status: { type: "string", enum: ["ACTIVE", "INACTIVE", "MAINTENANCE"], example: "MAINTENANCE" },
+                        status: { type: "string", enum: ["ACTIVE", "INACTIVE", "MAINTENANCE", "GROUNDED", "OUT_OF_SERVICE", "RETIRED", "RESERVED", "DELIVERING"], example: "MAINTENANCE" },
                     },
                 },
 
@@ -835,10 +861,11 @@ const options = {
                                 operatorId: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0d" },
                                 operatorName: { type: "string", example: "IndiGo Airlines" },
                                 airlineName: { type: "string", example: "IndiGo" },
-                                flightNumber: { type: "string", example: "6E-204" },
                                 registrationNumber: { type: "string", example: "VT-IGP" },
-                                aircraftType: { type: "string", example: "AIRBUS_A320" },
-                                classType: { type: "string", example: "ECONOMY" },
+                                manufacturer: { type: "string", example: "AIRBUS" },
+                                aircraftModel: { type: "string", example: "A320neo" },
+                                aircraftType: { type: "string", example: "AIRBUS_A320NEO" },
+                                cabinClasses: { type: "array", items: { type: "string" }, example: ["ECONOMY"] },
                                 totalSeats: { type: "integer", example: 180 },
                                 status: { type: "string", example: "ACTIVE" },
                                 averageRating: { type: "number", example: 0 },
@@ -912,10 +939,11 @@ const options = {
 
                 CreateFlightScheduleRequest: {
                     type: "object",
-                    required: ["routeId", "flightId", "departureDate", "departureTime", "arrivalTime", "baseFare"],
+                    required: ["routeId", "flightId", "flightNumber", "departureDate", "departureTime", "arrivalTime", "baseFare"],
                     properties: {
                         routeId: { type: "string", example: "682abc1234567890abcd5678" },
                         flightId: { type: "string", example: "682abc1234567890abcd1234" },
+                        flightNumber: { type: "string", example: "6E-204" },
                         departureDate: { type: "string", example: "2026-07-10", description: "YYYY-MM-DD" },
                         arrivalDate: { type: "string", example: "2026-07-10", description: "YYYY-MM-DD. Optional — defaults to departureDate for same-day flights." },
                         departureTime: { type: "string", example: "06:30", description: "HH:mm 24-hour" },
@@ -1186,6 +1214,11 @@ const options = {
                         state: { type: "string", example: "Tamil Nadu" },
                         starRating: { type: "integer", example: 5 },
                         amenities: { type: "array", items: { type: "string" }, example: ["WiFi", "Pool"] },
+                        images: {
+                            type: "array",
+                            items: { type: "string", format: "binary" },
+                            description: "Upload up to 10 image files"
+                        },
                     },
                 },
 

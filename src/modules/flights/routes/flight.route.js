@@ -22,6 +22,7 @@ import {
     blockSeats,
     cancelFlightSchedule,
     addFlightReview,
+    getVendorFlightSchedules,
 } from "../controllers/flight.controller.js";
 import { authenticate } from "../../../middleware/auth.middleware.js";
 import { authorize } from "../../../middleware/role.middleware.js";
@@ -508,6 +509,29 @@ router.post(
     authorize("vendor", "admin"),
     validate(createFlightScheduleSchema),
     createFlightSchedule
+);
+
+/**
+ * @swagger
+ * /api/v1/flights/schedules:
+ *   get:
+ *     summary: List all flight schedules for the logged-in vendor
+ *     tags: [Flights - Schedules]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: List of flight schedules.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ScheduleListResponse'
+ */
+router.get(
+    "/schedules",
+    authenticate,
+    authorize("vendor", "admin"),
+    getVendorFlightSchedules
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
