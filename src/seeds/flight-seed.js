@@ -167,14 +167,21 @@ async function seedFlights() {
         }
         console.log(`Created ${routes.length} routes`);
 
-        // Create Schedules (~300)
+        // Create Schedules (~1500)
         let scheduleCount = 0;
         const today = new Date();
         
-        // Distribute dates over next 7 days for the 56 routes
+        // Distribute dates over next 30 days for the 56 routes
         for (const route of routes) {
-            const flight = await Aircraft.findById(route.flightId);
-            for (let d = 1; d <= 6; d++) {
+            // Use the aircraft from the in-memory array (faster than DB lookup)
+            const aircraftIdx = aircrafts.findIndex(a => a._id.toString() === route.flightId.toString());
+            const flight = aircrafts[aircraftIdx];
+            
+            if (!flight) {
+                console.warn(`Skipping route ${route._id}: Aircraft ${route.flightId} not found`);
+                continue;
+            }
+            for (let d = 1; d <= 30; d++) {
                 const date = new Date(today);
                 date.setDate(date.getDate() + d);
                 
