@@ -34,8 +34,9 @@ export const createBus = async (req, res, next) => {
 
 export const getVendorBuses = async (req, res, next) => {
     try {
-        // Vendors can only see their own buses
-        const buses = await busService.getVendorBusesService(req.user._id);
+        // Vendors can only see their own buses.
+        // We pass req.query to support filtering by search, busType, from, and to.
+        const buses = await busService.getVendorBusesService(req.user._id, req.query);
 
         return res.status(200).json({
             success: true,

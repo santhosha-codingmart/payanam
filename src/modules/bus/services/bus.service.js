@@ -12,6 +12,7 @@ import { ApiError } from "../../../utils/ApiError.js";
 import redis from "../../../config/redis.js";
 import { Review } from "../models/review.model.js";
 import Booking from "../../bookings/models/booking.model.js";
+import { bulkUpsertCities } from "../../places/services/city.service.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BUS CRUD (Vendor-only)
@@ -46,10 +47,90 @@ export const createBusService = async (operatorId, payload) => {
     return bus;
 };
 
-// Gets all buses owned by the logged-in vendor
-export const getVendorBusesService = async (operatorId) => {
+// Gets all buses owned by the logged-in vendor, with optional filtering
+export const getVendorBusesService = async (operatorId, filters = {}) => {
+    const { search, busType, from, to } = filters;
+    const query = { operatorId };
+
+    // 1. Text Search: filter by registration number, bus number, or bus name
+    if (search) {
+        // Case-insensitive regex to match partial strings
+        const searchRegex = new RegExp(search, "i");
+        query.$or = [
+            { registrationNumber: searchRegex },
+            { busNumber: searchRegex },
+            { busName: searchRegex },
+        ];
+    }
+
+    // 2. Bus Type Filter: filter by AC_SEATER, AC_SLEEPER, etc.
+    if (busType) {
+        query.busType = busType;
+    }
+
+    // 3. Location Filter: filter by starting (from) and/or destination (to) location
+    // Since locations are stored in the Route model, we first query routes
+    // to find matching bus IDs, then add those IDs to our Bus query.
+    if (from || to) {
+        const routeQuery = { status: "ACTIVE" };
+        
+        if (from && to) {
+            const fromRegex = new RegExp(`^${from}$`, "i");
+            const toRegex = new RegExp(`^${to}$`, "i");
+            routeQuery.$and = [
+                {
+                    $or: [
+                        { "source.city": fromRegex },
+                        { "stops.city": fromRegex },
+                    ],
+                },
+                {
+                    $or: [
+                        { "destination.city": toRegex },
+                        { "stops.city": toRegex },
+                    ],
+                },
+            ];
+        } else if (from) {
+             const fromRegex = new RegExp(`^${from}$`, "i");
+             routeQuery.$or = [
+                 { "source.city": fromRegex },
+                 { "stops.city": fromRegex },
+             ];
+        } else if (to) {
+             const toRegex = new RegExp(`^${to}$`, "i");
+             routeQuery.$or = [
+                 { "destination.city": toRegex },
+                 { "stops.city": toRegex },
+             ];
+        }
+
+        const matchingRoutes = await Route.find(routeQuery).select("busId stops");
+        const validBusIds = new Set();
+        
+        // If both locations are provided, enforce direction (from comes before to)
+        if (from && to) {
+             const fromRegex = new RegExp(`^${from}$`, "i");
+             const toRegex = new RegExp(`^${to}$`, "i");
+             for (const route of matchingRoutes) {
+                 const fromStop = route.stops.find(s => fromRegex.test(s.city));
+                 const toStop = route.stops.find(s => toRegex.test(s.city));
+                 if (fromStop && toStop && fromStop.order < toStop.order) {
+                     validBusIds.add(route.busId.toString());
+                 }
+             }
+        } else {
+             for (const route of matchingRoutes) {
+                 validBusIds.add(route.busId.toString());
+             }
+        }
+
+        // Add the matching bus IDs to the main bus query
+        query._id = { $in: Array.from(validBusIds) };
+    }
+
     // We sort by createdAt: -1 to show the newest buses first
-    return await Bus.find({ operatorId }).sort({ createdAt: -1 });
+    return await Bus.find(query).sort({ createdAt: -1 });
 };
 
 // Gets a specific bus by its ID. Used by vendors to view their own bus details,
@@ -154,6 +235,35 @@ export const createRouteService = async (operatorId, routeData) => {
     routeData.stops.sort((a, b) => a.order - b.order);
 
     const route = await Route.create(routeData);
+
+    // 4. ── AUTO-REGISTER CITIES ──
+    // Every city mentioned in this route (source, destination, all stops) is
+    // automatically upserted into the City collection.
+    //
+    // WHY HERE?
+    //   The route is the authoritative source of city data in this platform.
+    //   When a vendor registers "Vellore → Bangalore", both cities should
+    //   immediately become searchable in the place search API — without any
+    //   manual admin action.
+    //
+    // HOW DUPLICATES ARE PREVENTED:
+    //   bulkUpsertCities uses MongoDB's compound unique index { name, state }
+    //   with upsert: true. If the city already exists, it's left unchanged
+    //   (except popularity is incremented). If it's new, it's inserted.
+    //   This is safe to call concurrently — MongoDB's atomic upsert handles races.
+    const citiesToUpsert = [
+        { name: routeData.source.city, state: routeData.source.state },
+        { name: routeData.destination.city, state: routeData.destination.state },
+        ...routeData.stops.map((stop) => ({ name: stop.city, state: stop.state || routeData.source.state })),
+    ];
+
+    // Fire-and-forget: city registration is important but should not block
+    // the vendor's route creation response. If it fails (e.g., transient DB
+    // error), the route is still created — cities can be re-synced later.
+    bulkUpsertCities(citiesToUpsert).catch((err) =>
+        console.error("[CityService] Failed to auto-register cities for route:", err.message)
+    );
+
     return route;
 };
 

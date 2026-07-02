@@ -5,6 +5,7 @@ import userRouter from "./modules/users/routes/user.routes.js";
 import busRouter from "./modules/bus/routes/bus.route.js";
 import flightRouter from "./modules/flights/routes/flight.route.js";
 import bookingRouter from "./modules/bookings/routes/booking.routes.js";
+import placeRouter from "./modules/places/routes/place.routes.js";
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middleware/error.middleware.js";
 import swaggerSpec from "./config/swagger.js";
@@ -50,6 +51,7 @@ app.use("/api/users", userRouter);
 app.use("/api/v1/buses", busRouter);
 app.use("/api/v1/flights", flightRouter);
 app.use("/api/v1/bookings", bookingRouter);
+app.use("/api/v1/places", placeRouter);
 
 // ── Global Error Handler (must come AFTER all routes) ─────────────────────────
 app.use(errorHandler);
