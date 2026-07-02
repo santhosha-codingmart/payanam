@@ -164,6 +164,7 @@ export const createScheduleSchema = z.object({
         departureTime: HHmm,
         arrivalTime: HHmm,
         baseFare: z.number().min(0, "Fare cannot be negative"),
+        arrivalDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD").optional(),
         
         // Boarding points are optional here because the service will
         // auto-generate them from the Route stops if they are missing.

@@ -297,11 +297,23 @@ export const createScheduleService = async (operatorId, scheduleData) => {
         throw new ApiError(400, "This route does not belong to the specified bus.");
     }
 
-    // 3. Duplicate check: Prevent creating two trips for the exact same bus
+    // 3. Validate and parse dates
+    const departureDateObj = new Date(departureDate);
+    if (isNaN(departureDateObj.getTime())) {
+        throw new ApiError(400, "Invalid departure date format");
+    }
+
+    // If arrivalDate is not provided, default to departureDate (same-day trips)
+    const arrivalDateObj = arrivalDate ? new Date(arrivalDate) : departureDateObj;
+    if (isNaN(arrivalDateObj.getTime())) {
+        throw new ApiError(400, "Invalid arrival date format");
+    }
+
+    // 4. Duplicate check: Prevent creating two trips for the exact same bus
     // at the exact same time on the exact same date.
     const duplicate = await Schedule.findOne({
         busId,
-        departureDate: new Date(departureDate),
+        departureDate: departureDateObj,
         departureTime,
     });
     if (duplicate) {
@@ -330,8 +342,8 @@ export const createScheduleService = async (operatorId, scheduleData) => {
         routeId,
         busId,
         operatorId,
-        departureDate: new Date(departureDate),
-        arrivalDate: new Date(arrivalDate),
+        departureDate: departureDateObj,
+        arrivalDate: arrivalDateObj,
         departureTime,
         arrivalTime,
         baseFare,

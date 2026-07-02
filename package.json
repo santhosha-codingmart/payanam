@@ -20,6 +20,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "fuse": "^0.12.1",
     "fuse.js": "^7.4.2",
     "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3",
