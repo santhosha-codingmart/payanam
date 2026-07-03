@@ -260,144 +260,11 @@ router.get(
     getVendorBuses
 );
 
-/**
- * @swagger
- * /api/v1/buses/{id}:
- *   get:
- *     summary: Get a specific bus by ID
- *     tags: [Buses - CRUD]
- *     security:
- *       - cookieAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Bus ObjectId
- *         example: "682abc1234567890abcd1234"
- *     responses:
- *       200:
- *         description: Bus details.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/BusResponse'
- *       404:
- *         description: Bus not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-router.get(
-    "/:id",
-    authenticate,
-    validate(busIdParamSchema),
-    getBusById
-);
 
-/**
- * @swagger
- * /api/v1/buses/{id}:
- *   patch:
- *     summary: Update a bus (owner only)
- *     description: Only the vendor who owns the bus can update it. Send only the fields you want to change.
- *     tags: [Buses - CRUD]
- *     security:
- *       - cookieAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Bus ObjectId
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/UpdateBusRequest'
- *     responses:
- *       200:
- *         description: Bus updated successfully.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/BusResponse'
- *       403:
- *         description: Not the owner of this bus
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       404:
- *         description: Bus not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       409:
- *         description: Duplicate bus number or registration number
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-router.patch(
-    "/:id",
-    authenticate,
-    authorize("vendor", "admin"),
-    validate(updateBusSchema),
-    updateBus
-);
 
-/**
- * @swagger
- * /api/v1/buses/{id}:
- *   delete:
- *     summary: Delete a bus and all its routes & schedules
- *     description: >
- *       **Cascade delete** — removes the bus along with ALL associated routes and schedules.
- *       Only the owner vendor can delete.
- *     tags: [Buses - CRUD]
- *     security:
- *       - cookieAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Bus ObjectId
- *     responses:
- *       200:
- *         description: Bus deleted successfully.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/SuccessResponse'
- *       403:
- *         description: Not the owner of this bus
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       404:
- *         description: Bus not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-router.delete(
-    "/:id",
-    authenticate,
-    authorize("vendor", "admin"),
-    validate(busIdParamSchema),
-    deleteBus
-);
+
+
+
 
 /**
  * @swagger
@@ -683,6 +550,7 @@ router.patch(
     cancelSchedule
 );
 
+
 /**
  * @swagger
  * /api/v1/buses/{id}:
@@ -702,6 +570,10 @@ router.patch(
  *     responses:
  *       200:
  *         description: Bus details.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/BusResponse'
  *       404:
  *         description: Bus not found
  *         content:
