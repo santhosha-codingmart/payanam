@@ -13,8 +13,13 @@ import User from "../modules/users/models/user.model.js";
  */
 export const authenticate = async (req, res, next) => {
     try {
-        // 1. Read the token from the cookie
-        const token = req.cookies?.accessToken;
+        // 1. Read the token from the cookie or Authorization header
+        let token = req.cookies?.accessToken;
+
+        // Fallback to Bearer token in headers (useful for Swagger UI / Postman testing)
+        if (!token && req.headers.authorization?.startsWith("Bearer ")) {
+            token = req.headers.authorization.split(" ")[1];
+        }
 
         if (!token) {
             return res.status(401).json({

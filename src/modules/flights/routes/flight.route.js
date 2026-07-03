@@ -266,121 +266,7 @@ router.get(
     getVendorFlights
 );
 
-/**
- * @swagger
- * /api/v1/flights/{id}:
- *   get:
- *     summary: Get a specific aircraft by ID
- *     tags: [Flights - CRUD]
- *     security:
- *       - cookieAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Aircraft ObjectId
- *     responses:
- *       200:
- *         description: Aircraft details.
- *       404:
- *         description: Flight not found.
- */
-router.get(
-    "/:id",
-    authenticate,
-    validate(flightIdParamSchema),
-    getFlightById
-);
 
-/**
- * @swagger
- * /api/v1/flights/{id}:
- *   patch:
- *     summary: Update an aircraft (owner only)
- *     description: Only the vendor who registered the aircraft can update it. Send only the fields you want to change.
- *     tags: [Flights - CRUD]
- *     security:
- *       - cookieAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/UpdateFlightRequest'
- *     responses:
- *       200:
- *         description: Aircraft updated successfully.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/FlightResponse'
- *       403:
- *         description: Not the owner.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       404:
- *         description: Flight not found.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       409:
- *         description: Duplicate flight number or registration number.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-router.patch(
-    "/:id",
-    authenticate,
-    authorize("vendor", "admin"),
-    validate(updateFlightSchema),
-    updateFlight
-);
-
-/**
- * @swagger
- * /api/v1/flights/{id}:
- *   delete:
- *     summary: Delete an aircraft and all its routes & schedules
- *     description: >
- *       **Cascade delete** — removes the aircraft along with ALL associated
- *       routes and schedules. Only the owner vendor can delete.
- *     tags: [Flights - CRUD]
- *     security:
- *       - cookieAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Aircraft deleted successfully.
- *       403:
- *         description: Not the owner.
- *       404:
- *         description: Flight not found.
- */
-router.delete(
-    "/:id",
-    authenticate,
-    authorize("vendor", "admin"),
-    validate(flightIdParamSchema),
-    deleteFlight
-);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VENDOR-ONLY ROUTES — Flight Routes
@@ -637,6 +523,122 @@ router.patch(
     authorize("vendor", "admin"),
     validate(scheduleIdParamSchema),
     cancelFlightSchedule
+);
+
+/**
+ * @swagger
+ * /api/v1/flights/{id}:
+ *   get:
+ *     summary: Get a specific aircraft by ID
+ *     tags: [Flights - CRUD]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Aircraft ObjectId
+ *     responses:
+ *       200:
+ *         description: Aircraft details.
+ *       404:
+ *         description: Flight not found.
+ */
+router.get(
+    "/:id",
+    authenticate,
+    validate(flightIdParamSchema),
+    getFlightById
+);
+
+/**
+ * @swagger
+ * /api/v1/flights/{id}:
+ *   patch:
+ *     summary: Update an aircraft (owner only)
+ *     description: Only the vendor who registered the aircraft can update it. Send only the fields you want to change.
+ *     tags: [Flights - CRUD]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UpdateFlightRequest'
+ *     responses:
+ *       200:
+ *         description: Aircraft updated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/FlightResponse'
+ *       403:
+ *         description: Not the owner.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Flight not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: Duplicate flight number or registration number.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.patch(
+    "/:id",
+    authenticate,
+    authorize("vendor", "admin"),
+    validate(updateFlightSchema),
+    updateFlight
+);
+
+/**
+ * @swagger
+ * /api/v1/flights/{id}:
+ *   delete:
+ *     summary: Delete an aircraft and all its routes & schedules
+ *     description: >
+ *       **Cascade delete** — removes the aircraft along with ALL associated
+ *       routes and schedules. Only the owner vendor can delete.
+ *     tags: [Flights - CRUD]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Aircraft deleted successfully.
+ *       403:
+ *         description: Not the owner.
+ *       404:
+ *         description: Flight not found.
+ */
+router.delete(
+    "/:id",
+    authenticate,
+    authorize("vendor", "admin"),
+    validate(flightIdParamSchema),
+    deleteFlight
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
