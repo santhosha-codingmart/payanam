@@ -260,7 +260,7 @@ const busSchema = new mongoose.Schema(
         // Current operational status of the bus
         status: {
             type: String,
-            enum: ["ACTIVE", "INACTIVE", "MAINTENANCE"],
+            enum: ["ACTIVE", "INACTIVE", "MAINTENANCE", "RETIRED"],
             default: "ACTIVE", // New buses start as ACTIVE
         },
     },

@@ -79,7 +79,8 @@ export const updateFlightService = async (flightId, operatorId, updateData) => {
     return flight;
 };
 
-// Deletes a flight and CASCADE-deletes all its routes and schedules.
+// Retires a flight instead of hard-deleting it.
+// Blocks deletion if there are active future schedules.
 export const deleteFlightService = async (flightId, operatorId) => {
     const flight = await Flight.findById(flightId);
     if (!flight) throw new ApiError(404, "Flight not found.");
@@ -89,12 +90,27 @@ export const deleteFlightService = async (flightId, operatorId) => {
         throw new ApiError(403, "You can only delete your own flights.");
     }
 
-    // ── CASCADE DELETE ──
-    // Without this, routes and schedules would become "orphaned" — they'd
-    // reference a flight that no longer exists.
-    await FlightSchedule.deleteMany({ flightId });
-    await FlightRoute.deleteMany({ flightId });
-    await Flight.findByIdAndDelete(flightId);
+    // ── ACTIVE SCHEDULES CHECK ──
+    // Check if this aircraft has any future schedules that are not cancelled or completed.
+    const now = new Date();
+    const activeSchedules = await FlightSchedule.countDocuments({
+        flightId,
+        departureDate: { $gte: now },
+        status: "SCHEDULED"
+    });
+
+    if (activeSchedules > 0) {
+        throw new ApiError(
+            400, 
+            `Cannot retire this aircraft. It is currently assigned to ${activeSchedules} active future schedule(s). Please cancel or reassign them first.`
+        );
+    }
+
+    // ── SOFT DELETE (RETIRE) ──
+    // Instead of wiping out historical routes, schedules, and orphaned bookings,
+    // we just mark the aircraft as RETIRED so it won't be available for new routes.
+    flight.status = "RETIRED";
+    await flight.save();
 
     return true;
 };

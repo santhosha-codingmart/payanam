@@ -189,7 +189,8 @@ export const updateBusService = async (busId, operatorId, updateData) => {
     return bus;
 };
 
-// Deletes a bus and everything associated with it
+// Retires a bus instead of hard-deleting it.
+// Blocks deletion if there are active future schedules.
 export const deleteBusService = async (busId, operatorId) => {
     const bus = await Bus.findById(busId);
     if (!bus) {
@@ -201,15 +202,27 @@ export const deleteBusService = async (busId, operatorId) => {
         throw new ApiError(403, "You can only delete your own buses.");
     }
 
-    // ── CASCADE DELETE ──
-    // If we just deleted the bus, we would leave "orphaned" routes and schedules
-    // in the database that point to a bus that no longer exists.
-    // So we delete them first.
-    await Schedule.deleteMany({ busId });
-    await Route.deleteMany({ busId });
+    // ── ACTIVE SCHEDULES CHECK ──
+    // Check if this bus has any future schedules that are not cancelled or completed.
+    const now = new Date();
+    const activeSchedules = await Schedule.countDocuments({
+        busId,
+        departureDate: { $gte: now },
+        status: "SCHEDULED"
+    });
 
-    // Finally, delete the bus itself
-    await Bus.findByIdAndDelete(busId);
+    if (activeSchedules > 0) {
+        throw new ApiError(
+            400, 
+            `Cannot retire this bus. It is currently assigned to ${activeSchedules} active future schedule(s). Please cancel or reassign them first.`
+        );
+    }
+
+    // ── SOFT DELETE (RETIRE) ──
+    // Instead of wiping out historical routes, schedules, and orphaned bookings,
+    // we just mark the bus as RETIRED so it won't be available for new routes.
+    bus.status = "RETIRED";
+    await bus.save();
 
     return true;
 };
