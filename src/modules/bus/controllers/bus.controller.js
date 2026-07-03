@@ -159,6 +159,20 @@ export const getVendorSchedules = async (req, res, next) => {
     }
 };
 
+export const getScheduleById = async (req, res, next) => {
+    try {
+        const schedule = await busService.getScheduleByIdService(req.params.scheduleId);
+        
+        return res.status(200).json({
+            success: true,
+            message: "Schedule fetched successfully.",
+            data: schedule,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Gets the full seat map for the frontend to render the bus layout
 export const getScheduleSeats = async (req, res, next) => {
     try {

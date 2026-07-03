@@ -249,6 +249,32 @@ export const getVendorFlightSchedulesService = async (operatorId) => {
     return schedules;
 };
 
+export const getFlightScheduleByIdService = async (scheduleId) => {
+    const schedule = await FlightSchedule.findById(scheduleId)
+        .populate({ path: "flightId", select: "airlineName registrationNumber aircraftModel aircraftType cabinClasses amenities averageRating photos operatorName totalSeats" })
+        .populate({ path: "routeId", select: "source destination stops distanceInKm estimatedDurationInMinutes" })
+        .select("-seats");
+        
+    if (!schedule) throw new ApiError(404, "Schedule not found");
+    
+    return {
+        scheduleId: schedule._id,
+        flight: schedule.flightId,
+        route: schedule.routeId,
+        departureDate: schedule.departureDate,
+        arrivalDate: schedule.arrivalDate,
+        departureTime: schedule.departureTime,
+        arrivalTime: schedule.arrivalTime,
+        departureTerminal: schedule.departureTerminal,
+        arrivalTerminal: schedule.arrivalTerminal,
+        baseFare: schedule.baseFare,
+        availableSeats: schedule.availableSeats,
+        totalSeats: schedule.seats ? schedule.seats.length : (schedule.flightId?.totalSeats || schedule.availableSeats),
+        mealOptions: schedule.mealOptions,
+        cancellationPolicy: schedule.cancellationPolicy,
+        status: schedule.status,
+    };
+};
 // Returns full seat map + flight/route details for the frontend to render.
 export const getFlightScheduleSeatsService = async (scheduleId) => {
     // .populate() replaces the stored ObjectId with the full referenced document.

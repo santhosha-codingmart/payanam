@@ -410,6 +410,32 @@ export const getVendorSchedulesService = async (operatorId) => {
     return schedules;
 };
 
+export const getScheduleByIdService = async (scheduleId) => {
+    const schedule = await Schedule.findById(scheduleId)
+        .populate({ path: "busId", select: "busName busNumber busType totalSeats amenities isAC isSleeper isSeater photos averageRating operatorName" })
+        .populate({ path: "routeId", select: "source destination distanceInKm estimatedDurationInMinutes boardingPoints droppingPoints farePerKm" })
+        .select("-seats");
+        
+    if (!schedule) throw new ApiError(404, "Schedule not found");
+    
+    return {
+        scheduleId: schedule._id,
+        bus: schedule.busId,
+        route: schedule.routeId,
+        departureDate: schedule.departureDate,
+        arrivalDate: schedule.arrivalDate,
+        departureTime: schedule.departureTime,
+        arrivalTime: schedule.arrivalTime,
+        baseFare: schedule.baseFare,
+        availableSeats: schedule.availableSeats,
+        totalSeats: schedule.seats ? schedule.seats.length : (schedule.busId?.totalSeats || schedule.availableSeats),
+        boardingPoints: schedule.boardingPoints,
+        droppingPoints: schedule.droppingPoints,
+        cancellationPolicy: schedule.cancellationPolicy,
+        status: schedule.status,
+    };
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SEARCH (Public — No auth required)
 // ─────────────────────────────────────────────────────────────────────────────

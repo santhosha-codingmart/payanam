@@ -1,0 +1,229 @@
+
+> ticketbookingsite@1.0.0 dev
+> nodemon src/server.js
+
+[33m[nodemon] 3.1.14[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[32m[nodemon] starting `node src/server.js`[39m
+◇ injected env (10) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+12774
+(node:12774) Warning: NodeVersionSupportWarning: The AWS SDK for JavaScript (v3)
+versions published after the first week of January 2027
+will require node >=22. You are running node v20.20.0.
+
+To continue receiving updates to AWS services, bug fixes,
+and security updates please upgrade to node >=22.
+
+More information can be found at: https://a.co/c895JFp
+(Use `node --trace-warnings ...` to show where the warning was created)
+Redis connected....
+MongoDB connected....
+✈️  Airport cache initialized: 50 airports loaded
+✅ City cache initialized: 1224 cities loaded
+🌆 Cities seeded successfully from JSON
+✈️  Airport cache initialized: 50 airports loaded
+✈️  Airports seeded successfully from JSON
+The server is running at the port: 3000
+[32m[nodemon] restarting due to changes...[39m
+[3[32m[nodemon] starting `node src/server.js`[3◇◇ injected env (10) from .env // tip: ⌘ suppress logs { quiet: true◇◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+13104
+(node:13104) Warning: NodeVersionSupportWarning: The AWS SDK for JavaScript (v3)
+versions published after the first week of January 2027
+will require node >=22. You are running node v20.20.0.
+
+To continue receiving updates to AWS services, bug fixes,
+and security updates please upgrade to node >=22.
+
+More information can be found at: https://a.co/c895JFp
+(Use `node --trace-warnings ...` to show where the warning was created)
+Redis connected....
+MongoDB connected..MongoDB connected....
+✈️  Airport cache initialized: 50 airports loaded
+✅ City cache initialized: 1224 cities loaded
+🌆 Cities seeded successfully from JSON
+✈️  Airport cache initialized: 50 airports loaded
+✈️  Airports seeded successfully from JSON
+The server is running[32m[nodemon] rest[32m[nodemon] restarting due [32m[nodemon] star[32m[nodemon] starting `node s◇ injected env (1◇ injected env (10) from .env // tip: ⌘ multiple files { p◇ injected env (0) from .env◇ injected env (0) from .env // tip: ⌘ sup◇ injected env (0) from .◇ injected env (0) from .env // tip: ⌘ override◇ injected env (0) from .en◇ injected env (0) from .env // tip: ◈ encryp◇ injected env (0) from .◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+13154
+(node:13154) Warning: NodeVersionSupportWarning: The AWS SDK for JavaScript (v3)
+versions published after the first week of January 2027
+will require node >=22. You are running node v20.20.0.
+
+To continue receiving updates to AWS services, bug fixes,
+and security updates please upgrade to node >=22.
+
+More information can be found at: https://a.co/c895JFp
+(Use `node --trace-warnings ...` to show where the warning was created)
+RediMongoDB connecteMongoDB connected....
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+◇ injected env (10) from .env // tip◇ injected env (10) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from .env // tip:◇ injected env (0) from .env // tip: ⌘ enable deb◇ injected env (0) fr◇ injected env (0) from .env // tip: ⌘ suppress l◇ injected env (0)◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenv◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+13190
+(node:13190) Warning: NodeVersionSupportWarning: The AWS SDK for JavaScript (v3)
+versions published after the first week of January 2027
+will require node >=22. You are running node v20.20.0.
+
+To continue receiving updates to AWS services, bug fixes,
+and security updates please upgrade to node >=22.
+
+More information can be found at: https://a.co/c895JFp
+(Use `node --MongoDB connected....
+✈️  Airport cache initialized: 50 airports loaded
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+◇ injected env (10) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (10) from .env // tip: ⌘ multiple files { path: ['.env.lo◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0)◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+13232
+(node:13232) Warning: NodeVersionSupportWarning: The AWS SDK for JavaScript (v3)
+versions published after the first week of January 2027
+will require node >=22. You are running node v20.20.0.
+
+To continue receiving updates to AWS services, bug fixes,
+and security updates please upgrade to node >=22.
+
+More information can be found at: https://a.co/c895JFp
+(UsMongoDB connected....
+✈️  Airport cache initialized: 50 airports loaded
+[32m[nodemon] restarting due to ch[32m[nodemon][32m[nodemon] starting `node src/server.js`[39m
+◇ injected env (10) from .env // ◇ injected env (10) from .env // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from .env // tip: ◈ se◇ injected env (0) from .env // t◇ injected env (0) from .env // tip: ⌘ enable debugg◇ injected env (0)◇ injected env (0) from .env // tip: ⌘ override exis◇ injected env (0) fro◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from .env // tip: ⌘ supp13270
+(node:13270) Warning13269
+(node:13269) Warning: NodeVersionSupportWarning: The AWS SDK for JavaScript (v3)
+versions published after the first week of January 2027
+will require node >=22. You are running node v20.20.0.
+
+To continue receiving updates to AWS services, bug fixes,
+and security updates please upgrade to node >=22.
+
+More information can be found at: https://a.co/c895JFp
+(Use `node --trace-warnings ...` to show where the warning was creMongoDB connected....
+✈�MongoDB connected....
+✈️  Airport cache initia✅ City cache initialized✅ City cache initialized: 1224 cities loaded
+🌆 Cities seeded successfully from JSON
+✈️  Airport cache initialized: 50 airports loaded
+✈️  Airports seeded successfully from JSON
+The server is [32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+◇ injected env (10) from◇ injected env (10) from .env // tip: ⌘ multiple fi◇ injected env (0) from .env // tip◇ injected env (0) from .env // tip: ◇ injected env (0) from .env // tip: �◇ injected env (0) from .env // tip◇ injected env (0) from .env // tip: ⌘ suppress ◇ injected env (0) ◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+13312
+(node:13312) Warning: NodeVersionSupportWarning: The AWS SDK for JavaScript (v3)
+versions published after the first week of January 2027
+will require node >=22. You are running node v20.20.0.
+
+To continue receiving updates to AWS services, bug fixes,
+and security updates please upgrade to node >=22.
+
+More information can be found at: https://a.co/c895JFp
+(Use `node --trace-warnings ...` to show where the warning was created)
+Redis connected....
+MongoDB connected....
+✈️  Airport MongoDB connected....
+✈️  Airport ✅ City cache initialized: 1224 citie✅ City cache initialized: 1224 cities loaded
+🌆 Cities seeded successfully from JSON
+✈️  Airport cache initialized: 50 airports loaded
+✈️  Airports seeded successfully from JSON
+Th[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+◇ injected env (10) from .env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+13382
+(node:13382) Warning: NodeVersionSupportWarning: The AWS SDK for JavaScript (v3)
+versions published after the first week of January 2027
+will require node >=22. You are running node v20.20.0.
+
+To continue receiving updates to AWS services, bug fixes,
+and security updates please upgrade to node >=22.
+
+More information can be found at: https://a.co/c895JFp
+(Use `node --trace-warnings ...` to show where the warning was created)
+Redis connected....
+MongoDB connected....
+✈️  Airport cache initialized: 50 airports loaded
+✅ City cache initialized: 1224 cities loaded
+🌆 Cities seeded successfully from JSON
+✈️  Airport cache initialized: 50 airports loaded
+✈️  Airports seeded successfully from JSON
+The server is running at the port: 3000
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+◇ injected env (10) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) fro◇ injected env (0) from .env // tip: ⌘ multiple file◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+13418
+(node:13418) Warning: NodeVersionSupportWarning: The AWS SDK for JavaScript (v3)
+versions published after the first week of January 2027
+will require node >=22. You are running node v20.20.0.
+
+To continue receiving updates to AWS services, bug fixes,
+and security updates please upgrade to node >=22.
+
+More information can be found at: https://a.co/c895JFp
+(Use `node --trace-warnings ...` to show where the warning was created)
+Redis connected....
+MongoDB connected....
+✈️  Airport cache initia✈️  Airport cache init✅ City cache initialized: 1224 cities loaded
+🌆 Cities seeded successfully from JSON
+✈️  Airport cache initialized: 50 airports loaded
+✈️  Airports seeded successfully from JSON
+The server is running at the port: 3000
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/server.js`[39m
+◇ injected env (10) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+13461
+(node:13461) Warning: NodeVersionSupportWarning: The AWS SDK for JavaScript (v3)
+versions published after the first week of January 2027
+will require node >=22. You are running node v20.20.0.
+
+To continue receiving updates to AWS services, bug fixes,
+and security updates please upgrade to node >=22.
+
+More information can be found at: https://a.co/c895JFp
+(Use `node --trace-warnings ...` to show where the warning was created)
+Redis connected....
+MongoDB connected....
+✈️  Airport cache initialized: 50 airports loaded
+�✅ City cache initialized: 1224 cities loaded
+🌆 Cities seeded successfully from JSON�✈️  Airport cache initialized: 50 airports loaded
+✈️  Airports seeded successfully from JSON
+The server is running at the port: 3000

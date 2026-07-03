@@ -9,6 +9,7 @@ import {
     getRoutesForBus,
     createSchedule,
     getScheduleSeats,
+    getScheduleById,
     searchBuses,
     blockSeats,
     addReview,
@@ -180,6 +181,31 @@ router.get(
     "/schedules/:scheduleId/seats",
     validate(scheduleIdParamSchema),
     getScheduleSeats
+);
+
+/**
+ * @swagger
+ * /api/v1/buses/schedules/{scheduleId}:
+ *   get:
+ *     summary: View schedule details
+ *     description: Returns the schedule metadata (without seats array).
+ *     tags: [Buses - Schedules]
+ *     parameters:
+ *       - in: path
+ *         name: scheduleId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Schedule details.
+ *       404:
+ *         description: Schedule not found.
+ */
+router.get(
+    "/schedules/:scheduleId",
+    validate(scheduleIdParamSchema),
+    getScheduleById
 );
 
 // ─────────────────────────────────────────────────────────────────────────────

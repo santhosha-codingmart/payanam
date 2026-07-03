@@ -23,6 +23,7 @@ import {
     cancelFlightSchedule,
     addFlightReview,
     getVendorFlightSchedules,
+    getFlightScheduleById,
 } from "../controllers/flight.controller.js";
 import { authenticate } from "../../../middleware/auth.middleware.js";
 import { authorize } from "../../../middleware/role.middleware.js";
@@ -185,6 +186,31 @@ router.get(
     "/schedules/:scheduleId/seats",
     validate(scheduleIdParamSchema),
     getFlightScheduleSeats
+);
+
+/**
+ * @swagger
+ * /api/v1/flights/schedules/{scheduleId}:
+ *   get:
+ *     summary: View schedule details
+ *     description: Returns the schedule metadata (without seats array).
+ *     tags: [Flights - Seats]
+ *     parameters:
+ *       - in: path
+ *         name: scheduleId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Schedule details.
+ *       404:
+ *         description: Schedule not found.
+ */
+router.get(
+    "/schedules/:scheduleId",
+    validate(scheduleIdParamSchema),
+    getFlightScheduleById
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
