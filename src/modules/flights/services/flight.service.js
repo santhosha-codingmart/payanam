@@ -391,7 +391,7 @@ export const searchFlightsService = async (from, to, date, filters = {}) => {
     const scheduleQuery = {
         routeId: { $in: routeIds },
         departureDate: { $gte: searchDate, $lt: nextDay },
-        status: "SCHEDULED",
+        status: { $in: ["SCHEDULED", "DELAYED", "BOARDING"] },
         availableSeats: { $gt: 0 }, // Skip fully booked flights
     };
 
