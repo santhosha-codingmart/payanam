@@ -148,7 +148,7 @@ const scheduleSchema = new mongoose.Schema(
         ],
 
         // ── Policies ─────────────────────────────────────────────────────
-        // Refund policy. E.g., cancel 24 hours before = 75% refund.
+        // Refund policy. E.g.,  24 hours before = 75% refund.
         cancellationPolicy: [
             {
                 hoursBeforeDeparture: { type: Number, required: true },
@@ -178,3 +178,4 @@ scheduleSchema.index({ routeId: 1, departureDate: 1 });
 scheduleSchema.index({ busId: 1, departureDate: 1, departureTime: 1 });
 
 export const Schedule = mongoose.model("Schedule", scheduleSchema);
+cancel

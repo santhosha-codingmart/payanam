@@ -378,6 +378,10 @@ const options = {
                                 seatLayoutType: { type: "string", enum: ["2+1_SLEEPER", "2+2_SEATER", "1+1_SLEEPER", "2+1_SEATER"] },
                         totalSeats: { type: "integer", example: 36 },
                         busType: { type: "string", example: "AC_SLEEPER" },
+                                seatLayout: {
+                                    type: "array",
+                                    items: { $ref: "#/components/schemas/SeatLayoutItem" }
+                                },
                                 totalSeats: { type: "integer", example: 36 },
                                 status: { type: "string", example: "ACTIVE" },
                             },
@@ -393,7 +397,21 @@ const options = {
                         count: { type: "integer", example: 3 },
                         data: {
                             type: "array",
-                            items: { type: "object" },
+                            items: {
+                                type: "object",
+                                properties: {
+                                    _id: { type: "string" },
+                                    operatorId: { type: "string" },
+                                    operatorName: { type: "string" },
+                                    busName: { type: "string" },
+                                    busNumber: { type: "string" },
+                                    busType: { type: "string" },
+                                    seatLayoutType: { type: "string" },
+                                    totalSeats: { type: "integer" },
+                                    status: { type: "string" },
+                                    createdAt: { type: "string", format: "date-time" }
+                                }
+                            },
                         },
                     },
                 },
@@ -456,7 +474,22 @@ const options = {
                     properties: {
                         success: { type: "boolean", example: true },
                         message: { type: "string", example: "Route created successfully." },
-                        data: { type: "object" },
+                        data: {
+                            type: "object",
+                            properties: {
+                                _id: { type: "string" },
+                                busId: { type: "string" },
+                                source: { $ref: "#/components/schemas/LocationItem" },
+                                destination: { $ref: "#/components/schemas/LocationItem" },
+                                stops: { type: "array", items: { $ref: "#/components/schemas/StopItem" } },
+                                distanceInKm: { type: "number" },
+                                farePerKm: { type: "number" },
+                                estimatedDurationInMinutes: { type: "integer" },
+                                status: { type: "string", example: "ACTIVE" },
+                                createdAt: { type: "string", format: "date-time" },
+                                updatedAt: { type: "string", format: "date-time" }
+                            }
+                        },
                     },
                 },
 
@@ -465,7 +498,23 @@ const options = {
                     properties: {
                         success: { type: "boolean", example: true },
                         count: { type: "integer", example: 2 },
-                        data: { type: "array", items: { type: "object" } },
+                        data: {
+                            type: "array",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    _id: { type: "string" },
+                                    busId: { type: "string" },
+                                    source: { $ref: "#/components/schemas/LocationItem" },
+                                    destination: { $ref: "#/components/schemas/LocationItem" },
+                                    stops: { type: "array", items: { $ref: "#/components/schemas/StopItem" } },
+                                    distanceInKm: { type: "number" },
+                                    farePerKm: { type: "number" },
+                                    estimatedDurationInMinutes: { type: "integer" },
+                                    status: { type: "string", example: "ACTIVE" }
+                                }
+                            }
+                        },
                     },
                 },
 
@@ -525,7 +574,27 @@ const options = {
                     properties: {
                         success: { type: "boolean", example: true },
                         message: { type: "string", example: "Schedule created successfully." },
-                        data: { type: "object" },
+                        data: {
+                            type: "object",
+                            properties: {
+                                _id: { type: "string" },
+                                routeId: { type: "string" },
+                                busId: { type: "string" },
+                                operatorId: { type: "string" },
+                                departureDate: { type: "string", format: "date-time" },
+                                arrivalDate: { type: "string", format: "date-time" },
+                                departureTime: { type: "string" },
+                                arrivalTime: { type: "string" },
+                                baseFare: { type: "number" },
+                                availableSeats: { type: "integer" },
+                                boardingPoints: { type: "array", items: { $ref: "#/components/schemas/BoardingDroppingPoint" } },
+                                droppingPoints: { type: "array", items: { $ref: "#/components/schemas/BoardingDroppingPoint" } },
+                                cancellationPolicy: { type: "array", items: { $ref: "#/components/schemas/CancellationTier" } },
+                                status: { type: "string", example: "SCHEDULED" },
+                                createdAt: { type: "string", format: "date-time" },
+                                updatedAt: { type: "string", format: "date-time" }
+                            }
+                        },
                     },
                 },
 
@@ -534,7 +603,40 @@ const options = {
                     properties: {
                         success: { type: "boolean", example: true },
                         count: { type: "integer", example: 10 },
-                        data: { type: "array", items: { type: "object" } },
+                        data: {
+                            type: "array",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    _id: { type: "string" },
+                                    routeId: {
+                                        type: "object",
+                                        properties: {
+                                            _id: { type: "string" },
+                                            source: { $ref: "#/components/schemas/LocationItem" },
+                                            destination: { $ref: "#/components/schemas/LocationItem" }
+                                        }
+                                    },
+                                    busId: {
+                                        type: "object",
+                                        properties: {
+                                            _id: { type: "string" },
+                                            busName: { type: "string" },
+                                            busNumber: { type: "string" },
+                                            busType: { type: "string" }
+                                        }
+                                    },
+                                    operatorId: { type: "string" },
+                                    departureDate: { type: "string", format: "date-time" },
+                                    arrivalDate: { type: "string", format: "date-time" },
+                                    departureTime: { type: "string" },
+                                    arrivalTime: { type: "string" },
+                                    baseFare: { type: "number" },
+                                    availableSeats: { type: "integer" },
+                                    status: { type: "string", example: "SCHEDULED" }
+                                }
+                            }
+                        },
                     },
                 },
 
@@ -704,7 +806,24 @@ const options = {
                     properties: {
                         success: { type: "boolean", example: true },
                         count: { type: "integer", example: 3 },
-                        data: { type: "array", items: { type: "object" } },
+                        data: {
+                            type: "array",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    _id: { type: "string" },
+                                    userId: { type: "string" },
+                                    scheduleId: { type: "string" },
+                                    bookingId: { type: "string" },
+                                    bookingStatus: { type: "string", example: "CONFIRMED" },
+                                    paymentStatus: { type: "string", example: "SUCCESS" },
+                                    paymentReference: { type: "string" },
+                                    totalFare: { type: "number" },
+                                    bookedSeats: { type: "array", items: { type: "string" } },
+                                    bookedAt: { type: "string", format: "date-time" }
+                                }
+                            }
+                        },
                     },
                 },
 
@@ -890,11 +1009,15 @@ const options = {
                                 totalSeats: { type: "integer", example: 180 },
                         cabinClasses: { type: "array", items: { type: "string" }, example: ["ECONOMY"] },
                                 totalSeats: { type: "integer", example: 180 },
-                        economySeats: { type: "integer", example: 180 },
-                        premiumEconomySeats: { type: "integer", example: 0 },
-                        businessSeats: { type: "integer", example: 0 },
-                        firstClassSeats: { type: "integer", example: 0 },
-                        amenities: { type: "array", items: { type: "string" } },
+                                economySeats: { type: "integer", example: 180 },
+                                premiumEconomySeats: { type: "integer", example: 0 },
+                                businessSeats: { type: "integer", example: 0 },
+                                firstClassSeats: { type: "integer", example: 0 },
+                                amenities: { type: "array", items: { type: "string" } },
+                                seatLayout: {
+                                    type: "array",
+                                    items: { $ref: "#/components/schemas/FlightSeatLayoutItem" }
+                                },
                                 status: { type: "string", example: "ACTIVE" },
                                 averageRating: { type: "number", example: 0 },
                                 totalRatings: { type: "integer", example: 0 },
@@ -910,7 +1033,25 @@ const options = {
                         success: { type: "boolean", example: true },
                         message: { type: "string", example: "Flights fetched successfully." },
                         count: { type: "integer", example: 2 },
-                        data: { type: "array", items: { type: "object" } },
+                        data: {
+                            type: "array",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    _id: { type: "string" },
+                                    operatorId: { type: "string" },
+                                    operatorName: { type: "string" },
+                                    airlineName: { type: "string" },
+                                    registrationNumber: { type: "string" },
+                                    manufacturer: { type: "string" },
+                                    aircraftModel: { type: "string" },
+                                    aircraftType: { type: "string" },
+                                    totalSeats: { type: "integer" },
+                                    cabinClasses: { type: "array", items: { type: "string" } },
+                                    status: { type: "string" }
+                                }
+                            }
+                        },
                     },
                 },
 
@@ -950,7 +1091,21 @@ const options = {
                     properties: {
                         success: { type: "boolean", example: true },
                         message: { type: "string", example: "Route created successfully." },
-                        data: { type: "object" },
+                        data: {
+                            type: "object",
+                            properties: {
+                                _id: { type: "string" },
+                                flightId: { type: "string" },
+                                source: { $ref: "#/components/schemas/AirportItem" },
+                                destination: { $ref: "#/components/schemas/AirportItem" },
+                                stops: { type: "array", items: { $ref: "#/components/schemas/FlightStopItem" } },
+                                distanceInKm: { type: "number" },
+                                estimatedDurationInMinutes: { type: "integer" },
+                                status: { type: "string", example: "ACTIVE" },
+                                createdAt: { type: "string", format: "date-time" },
+                                updatedAt: { type: "string", format: "date-time" }
+                            }
+                        },
                     },
                 },
 
@@ -959,7 +1114,22 @@ const options = {
                     properties: {
                         success: { type: "boolean", example: true },
                         count: { type: "integer", example: 2 },
-                        data: { type: "array", items: { type: "object" } },
+                        data: {
+                            type: "array",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    _id: { type: "string" },
+                                    flightId: { type: "string" },
+                                    source: { $ref: "#/components/schemas/AirportItem" },
+                                    destination: { $ref: "#/components/schemas/AirportItem" },
+                                    stops: { type: "array", items: { $ref: "#/components/schemas/FlightStopItem" } },
+                                    distanceInKm: { type: "number" },
+                                    estimatedDurationInMinutes: { type: "integer" },
+                                    status: { type: "string", example: "ACTIVE" }
+                                }
+                            }
+                        },
                     },
                 },
 
@@ -997,7 +1167,29 @@ const options = {
                     properties: {
                         success: { type: "boolean", example: true },
                         message: { type: "string", example: "Schedule created successfully." },
-                        data: { type: "object" },
+                        data: {
+                            type: "object",
+                            properties: {
+                                _id: { type: "string" },
+                                routeId: { type: "string" },
+                                flightId: { type: "string" },
+                                flightNumber: { type: "string" },
+                                operatorId: { type: "string" },
+                                departureDate: { type: "string", format: "date-time" },
+                                arrivalDate: { type: "string", format: "date-time" },
+                                departureTime: { type: "string" },
+                                arrivalTime: { type: "string" },
+                                baseFare: { type: "number" },
+                                departureTerminal: { type: "string" },
+                                arrivalTerminal: { type: "string" },
+                                mealOptions: { type: "array", items: { type: "string" } },
+                                cancellationPolicy: { type: "array", items: { $ref: "#/components/schemas/CancellationTier" } },
+                                availableSeats: { type: "integer" },
+                                status: { type: "string", example: "SCHEDULED" },
+                                createdAt: { type: "string", format: "date-time" },
+                                updatedAt: { type: "string", format: "date-time" }
+                            }
+                        },
                     },
                 },
 
