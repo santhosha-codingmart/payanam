@@ -1,4 +1,6 @@
 import { getUserProfile, updateUserProfile, getVendorDashboardService } from "../services/user.service.js";
+import { uploadToCloudinary, deleteFromCloudinary } from "../../../utils/cloudinary.js";
+import User from "../models/user.model.js";
 
 /**
  * GET /api/users/profile
@@ -63,6 +65,64 @@ export const getVendorDashboard = async (req, res, next) => {
             success: true,
             message: "Dashboard summary fetched successfully.",
             data: summary,
+        });
+    } catch (error) {
+        return next(error);
+    }
+};
+
+/**
+ * POST /api/users/profile/upload-image
+ *
+ * Uploads a profile image to Cloudinary and updates the user's profile.
+ */
+export const uploadProfileImage = async (req, res, next) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "No image file provided."
+            });
+        }
+
+        const user = await User.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found."
+            });
+        }
+
+        // Delete old image from Cloudinary if it exists
+        if (user.profileImage) {
+            const oldPublicId = user.profileImage.split('/').slice(-2).join('/').split('.')[0];
+            if (oldPublicId) {
+                await deleteFromCloudinary(oldPublicId);
+            }
+        }
+
+        // Upload new image to Cloudinary
+        const uploadResult = await uploadToCloudinary(req.file, "users/profile");
+        
+        if (!uploadResult.success) {
+            return res.status(500).json({
+                success: false,
+                message: "Failed to upload image.",
+                error: uploadResult.error
+            });
+        }
+
+        // Update user profile with new image URL
+        user.profileImage = uploadResult.url;
+        await user.save();
+
+        const updatedUser = user.toObject();
+        delete updatedUser.password;
+
+        return res.status(200).json({
+            success: true,
+            message: "Profile image uploaded successfully.",
+            data: updatedUser
         });
     } catch (error) {
         return next(error);

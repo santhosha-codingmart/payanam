@@ -1,9 +1,26 @@
 import express from "express";
-import { getProfile, updateProfile, getVendorDashboard } from "../controllers/user.controller.js";
+import multer from "multer";
+import { getProfile, updateProfile, getVendorDashboard, uploadProfileImage } from "../controllers/user.controller.js";
 import { authenticate } from "../../../middleware/auth.middleware.js";
 import { authorize } from "../../../middleware/role.middleware.js";
 import { validate } from "../../../middleware/validate.middleware.js";
 import { updateProfileSchema } from "../validators/user.validator.js";
+
+// Configure multer for file uploads (stores in memory, not disk)
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  }
+});
 
 const router = express.Router();
 
@@ -117,6 +134,41 @@ router.get(
     authenticate,
     authorize("vendor", "admin"),
     getVendorDashboard
+);
+
+/**
+ * @swagger
+ * /api/users/profile/upload-image:
+ *   post:
+ *     summary: Upload profile image
+ *     tags: [Users]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Image uploaded successfully.
+ *       400:
+ *         description: No image file provided.
+ *       401:
+ *         description: Not authenticated.
+ *       500:
+ *         description: Upload failed.
+ */
+router.post(
+    "/profile/upload-image",
+    authenticate,
+    upload.single("image"),
+    uploadProfileImage
 );
 
 export default router;
