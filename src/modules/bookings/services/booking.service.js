@@ -20,6 +20,10 @@ import { Schedule } from "../../bus/models/schedule.model.js";
 import { Bus } from "../../bus/models/bus.model.js";
 import { ApiError } from "../../../utils/ApiError.js";
 import redis from "../../../config/redis.js";
+import { initiateRefund } from "../../payments/services/payment.service.js";
+import { sendBookingCancellationEmail } from "../../../utils/email.service.js";
+import User from "../../users/models/user.model.js";
+import { generateTicketPDF } from "../../../utils/ticket.pdf.service.js";
 
 // =============================================================================
 // LADIES SEAT PROTECTION — Helper
@@ -310,17 +314,11 @@ export const createBookingService = async (userId, payload) => {
     }
     await delPipeline.exec();
 
-    // ── STEP 8 & 9: Mock payment + confirm booking ───────────────────────────
-    // In production: integrate Razorpay/Stripe here.
-    // For now we simulate an instant successful payment.
-    const mockPaymentRef = `MOCK-PAY-${Date.now()}`;
-    booking.paymentStatus = "SUCCESS";
-    booking.bookingStatus = "CONFIRMED";
-    booking.paymentReference = mockPaymentRef;
-    booking.bookedAt = new Date();
-    await booking.save();
-
-    // ── STEP 10: Return the complete ticket ──────────────────────────────────
+    // ── STEP 8: Return the PENDING booking for payment ──────────────────────
+    // The booking is now PENDING — seats are reserved in the DB.
+    // The frontend should immediately call POST /api/v1/payments/create-order
+    // with the returned booking._id to initiate the Razorpay payment flow.
+    // Only after successful payment verification will the booking become CONFIRMED.
     return booking;
 };
 
@@ -519,6 +517,47 @@ export const cancelBookingService = async (userId, bookingId) => {
     booking.cancelledAt = new Date();
     await booking.save();
 
+    // 7. Initiate Razorpay refund (if applicable) ─────────────────────────────
+    // This calls Razorpay's refund API using the paymentId stored in the Payment doc.
+    // Non-blocking: a failure here does NOT roll back the cancellation.
+    if (refundAmount > 0) {
+        await initiateRefund(booking._id, refundAmount);
+    }
+
+    // 8. Send booking cancellation email (non-blocking, non-fatal) ───────────
+    try {
+        const user = await User.findById(booking.userId).select("name email");
+
+        // Fetch route & schedule for the email content
+        const [routeDoc, scheduleDoc] = await Promise.all([
+            mongoose.model("Route").findById(booking.routeId).select("source destination").lean(),
+            Schedule.findById(booking.scheduleId).select("departureDate departureTime").lean(),
+        ]);
+
+        const depDate = scheduleDoc?.departureDate
+            ? new Date(scheduleDoc.departureDate).toLocaleDateString("en-IN", {
+                  day: "2-digit", month: "short", year: "numeric",
+                  timeZone: "Asia/Kolkata",
+              })
+            : "—";
+
+        if (user?.email) {
+            await sendBookingCancellationEmail(user.email, {
+                bookingId:     booking.bookingId,
+                userName:      user.name,
+                source:        routeDoc?.source      || "—",
+                destination:   routeDoc?.destination || "—",
+                departureDate: depDate,
+                departureTime: scheduleDoc?.departureTime || "—",
+                totalFare:     booking.totalFare,
+                refundAmount,
+                cancelledAt:   booking.cancelledAt,
+            });
+        }
+    } catch (emailErr) {
+        console.error("[Booking] Cancellation email error (non-fatal):", emailErr.message);
+    }
+
     return {
         bookingId: booking.bookingId,
         refundAmount,
@@ -567,4 +606,42 @@ export const calculateRefund = (booking) => {
     }
 
     return 0; // No matching tier → non-refundable
+};
+
+// =============================================================================
+// DOWNLOAD TICKET — Generate PDF for a confirmed booking
+// =============================================================================
+//
+// Called from: GET /api/v1/bookings/:bookingId/download-ticket
+//
+// Returns a Buffer containing the PDF bytes.
+// The controller streams it directly to the browser as a file download.
+//
+// SECURITY: Only the booking owner can download their ticket.
+// =============================================================================
+export const downloadTicketService = async (userId, bookingId) => {
+    const booking = await Booking.findOne({ bookingId })
+        .populate("userId",     "name email")
+        .populate("busId",      "busName busNumber busType operatorName")
+        .populate("routeId",    "source destination")
+        .populate("scheduleId", "departureDate departureTime arrivalTime");
+
+    if (!booking) throw new ApiError(404, "Booking not found.");
+
+    // Ownership check
+    if (booking.userId._id.toString() !== userId.toString()) {
+        throw new ApiError(403, "You are not authorized to download this ticket.");
+    }
+
+    // Only CONFIRMED bookings produce a valid ticket PDF
+    if (booking.bookingStatus !== "CONFIRMED") {
+        throw new ApiError(
+            400,
+            `A ticket PDF is only available for confirmed bookings. ` +
+            `This booking is ${booking.bookingStatus}.`
+        );
+    }
+
+    const pdfBuffer = await generateTicketPDF(booking);
+    return { pdfBuffer, bookingId: booking.bookingId };
 };

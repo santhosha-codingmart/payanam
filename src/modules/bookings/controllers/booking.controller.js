@@ -126,3 +126,27 @@ export const getVendorBookings = async (req, res, next) => {
         next(error);
     }
 };
+
+// =============================================================================
+// GET /api/v1/bookings/:bookingId/download-ticket
+// Generates and streams a PDF ticket for a confirmed booking.
+// =============================================================================
+export const downloadTicket = async (req, res, next) => {
+    try {
+        const { pdfBuffer, bookingId } = await bookingService.downloadTicketService(
+            req.user._id,
+            req.params.bookingId
+        );
+
+        // Stream the PDF directly to the client as a file download
+        res.set({
+            "Content-Type":        "application/pdf",
+            "Content-Disposition": `attachment; filename="Payanam-Ticket-${bookingId}.pdf"`,
+            "Content-Length":      pdfBuffer.length,
+            "Cache-Control":       "no-store",
+        });
+        return res.end(pdfBuffer);
+    } catch (error) {
+        next(error);
+    }
+};

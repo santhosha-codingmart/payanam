@@ -178,4 +178,3 @@ scheduleSchema.index({ routeId: 1, departureDate: 1 });
 scheduleSchema.index({ busId: 1, departureDate: 1, departureTime: 1 });
 
 export const Schedule = mongoose.model("Schedule", scheduleSchema);
-cancel

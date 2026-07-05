@@ -6,20 +6,20 @@ function getCloudinary() {
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
     const apiKey = process.env.CLOUDINARY_API_KEY;
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
-    
+
     // Log raw credentials (masked) for debugging
     console.log("[Cloudinary] Environment variables:");
     console.log("  CLOUDINARY_CLOUD_NAME:", cloudName);
     console.log("  CLOUDINARY_API_KEY:", apiKey ? apiKey.substring(0, 8) + "..." : "MISSING");
     console.log("  CLOUDINARY_API_SECRET:", apiSecret ? apiSecret.substring(0, 8) + "..." + " (length: " + apiSecret.length + ")" : "MISSING");
-    
+
     if (!cloudName || !apiKey || !apiSecret) {
       console.error("[Cloudinary] ERROR: Missing credentials");
       throw new Error("Cloudinary credentials are missing from environment variables");
     }
-    
+
     console.log("[Cloudinary] API Secret length:", apiSecret.length, "characters");
-    
+
     // Configure with explicit parameters
     cloudinary.config({
       cloud_name: cloudName,
@@ -28,7 +28,7 @@ function getCloudinary() {
       secure: true,
       timeout: 30000, // 30 second timeout
     });
-    
+
     console.log("[Cloudinary] Configuration applied successfully");
     console.log("  cloud_name:", cloudinary.config().cloud_name);
     console.log("  api_key set:", cloudinary.config().api_key ? "YES" : "NO");
@@ -50,7 +50,7 @@ export const uploadToCloudinary = async (file, folder = "users/profile") => {
       folder: folder,
       resource_type: "auto"
     };
-    
+
     // Only add transformations for images
     if (file && file.mimetype && file.mimetype.startsWith('image/')) {
       uploadOptions.transformation = [
@@ -64,13 +64,13 @@ export const uploadToCloudinary = async (file, folder = "users/profile") => {
       const buffer = file.buffer;
       const mimeType = file.mimetype || file.type || 'image/jpeg';
       uploadOptions.resource_type = mimeType.startsWith('video/') ? 'video' : 'image';
-      
+
       // Convert to base64 for reliable upload
       const base64 = buffer.toString('base64');
       const dataUrl = `data:${mimeType};base64,${base64}`;
-      
+
       const result = await cld.uploader.upload(dataUrl, uploadOptions);
-      
+
       return {
         success: true,
         url: result.secure_url,
@@ -82,9 +82,9 @@ export const uploadToCloudinary = async (file, folder = "users/profile") => {
       // Convert to base64 for reliable upload
       const base64 = file.toString('base64');
       const dataUrl = `data:image/jpeg;base64,${base64}`;
-      
+
       const result = await cld.uploader.upload(dataUrl, uploadOptions);
-      
+
       return {
         success: true,
         url: result.secure_url,
@@ -140,5 +140,3 @@ export const deleteFromCloudinary = async (publicId) => {
     };
   }
 };
-
-export default getCloudinary();

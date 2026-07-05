@@ -20,6 +20,7 @@ import {
     getMyBookings,
     getVendorBookings,
     cancelBooking,
+    downloadTicket,
 } from "../controllers/booking.controller.js";
 import { authenticate } from "../../../middleware/auth.middleware.js";
 import { authorize } from "../../../middleware/role.middleware.js";
@@ -346,6 +347,118 @@ router.post(
     authenticate,
     validate(cancelBookingSchema),
     cancelBooking
+);
+
+// =============================================================================
+// GET /api/v1/bookings/:bookingId/download-ticket
+// =============================================================================
+/**
+ * @swagger
+ * /api/v1/bookings/{bookingId}/download-ticket:
+ *   get:
+ *     summary: Download the PDF ticket for a confirmed booking
+ *     description: >
+ *       Generates and streams a **branded PDF boarding pass** for a `CONFIRMED`
+ *       booking. The response is a raw PDF binary (`application/pdf`) with:
+ *
+ *       ```
+ *       Content-Disposition: attachment; filename="Payanam-Ticket-PAY-XXXXXX.pdf"
+ *       ```
+ *
+ *       The PDF contains:
+ *       - 🎟 Booking reference (PNR) + total fare
+ *       - 🚏 Route: From → To with boarding & dropping points
+ *       - 🚌 Bus name, number and type
+ *       - 📅 Departure date, time → arrival time
+ *       - 👤 Passenger table (name, seat, age, gender)
+ *       - 💳 Razorpay payment reference
+ *
+ *       **📧 Email auto-send (on confirmation):**
+ *       When a booking is confirmed via `POST /api/v1/payments/verify`, a PDF
+ *       ticket is automatically generated and emailed to the passenger as an
+ *       attachment. This endpoint lets them re-download it on demand.
+ *
+ *       **Access control:** Only the booking owner can download their ticket.
+ *
+ *       **Status check:** Returns HTTP 400 if the booking is `PENDING` or `CANCELLED`
+ *       (only `CONFIRMED` bookings produce a valid ticket).
+ *     tags: [Bookings]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           pattern: '^PAY-[A-F0-9]{6}$'
+ *         example: "PAY-A3F2B1"
+ *         description: Human-readable PNR / booking reference (format PAY-XXXXXX)
+ *     responses:
+ *       200:
+ *         description: >
+ *           Binary PDF stream. Browsers will prompt a file-save dialog.
+ *           Filename: `Payanam-Ticket-{bookingId}.pdf`
+ *         headers:
+ *           Content-Disposition:
+ *             description: Forces the browser to download rather than display
+ *             schema:
+ *               type: string
+ *               example: 'attachment; filename="Payanam-Ticket-PAY-A3F2B1.pdf"'
+ *           Content-Type:
+ *             schema:
+ *               type: string
+ *               example: application/pdf
+ *           Cache-Control:
+ *             schema:
+ *               type: string
+ *               example: no-store
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       400:
+ *         description: >
+ *           Booking is not in `CONFIRMED` status.
+ *           Only confirmed bookings have a valid ticket to download.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "A ticket PDF is only available for confirmed bookings. This booking is PENDING."
+ *       401:
+ *         description: Not authenticated — missing or invalid access token cookie
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Booking belongs to a different user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "You are not authorized to download this ticket."
+ *       404:
+ *         description: Booking not found for the given PNR
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Booking not found."
+ */
+router.get(
+    "/:bookingId/download-ticket",
+    authenticate,
+    validate(getBookingSchema),   // reuses same PNR format check
+    downloadTicket
 );
 
 export default router;

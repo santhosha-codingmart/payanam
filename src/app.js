@@ -9,6 +9,7 @@ import bookingRouter from "./modules/bookings/routes/booking.routes.js";
 import placeRouter from "./modules/places/routes/place.routes.js";
 import hotelRouter from "./modules/hotels/routes/hotel.routes.js";
 import aiRouter from "./modules/ai/routes/ai.routes.js";
+import paymentRouter from "./modules/payments/routes/payment.routes.js";
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middleware/error.middleware.js";
 import swaggerSpec from "./config/swagger.js";
@@ -58,6 +59,7 @@ app.use("/api/v1/bookings", bookingRouter);
 app.use("/api/v1/places", placeRouter);
 app.use("/api/v1/hotels", hotelRouter);
 app.use("/api/v1/ai", aiRouter);
+app.use("/api/v1/payments", paymentRouter);
 
 // ── Global Error Handler (must come AFTER all routes) ─────────────────────────
 app.use(errorHandler);

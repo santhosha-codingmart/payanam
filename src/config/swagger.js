@@ -843,9 +843,423 @@ const options = {
                     },
                 },
 
+                // Full ticket view — returned by GET /bookings/:bookingId
+                BookingDetailResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        data: {
+                            type: "object",
+                            properties: {
+                                bookingId: {
+                                    type: "string",
+                                    example: "PAY-A3F2B1",
+                                    description: "Human-readable PNR shown on the ticket",
+                                },
+                                bookingStatus: {
+                                    type: "string",
+                                    enum: ["PENDING", "CONFIRMED", "CANCELLED"],
+                                    example: "CONFIRMED",
+                                },
+                                paymentStatus: {
+                                    type: "string",
+                                    enum: ["PENDING", "SUCCESS", "FAILED", "REFUNDED"],
+                                    example: "SUCCESS",
+                                },
+                                paymentReference: {
+                                    type: "string",
+                                    nullable: true,
+                                    example: "pay_R2sT5xZaK3mNL9P",
+                                    description: "Razorpay payment ID stored at confirmation",
+                                },
+                                totalFare: { type: "number", example: 1750 },
+                                refundAmount: { type: "number", example: 0 },
+                                bookedSeats: {
+                                    type: "array",
+                                    items: { type: "string" },
+                                    example: ["L1", "L2"],
+                                },
+                                bookedAt: { type: "string", format: "date-time" },
+                                cancelledAt: { type: "string", format: "date-time", nullable: true },
+                                userId: {
+                                    type: "object",
+                                    description: "Populated user — only safe fields",
+                                    properties: {
+                                        name:    { type: "string", example: "Santhosh Kumar" },
+                                        email:   { type: "string", example: "santhosh@example.com" },
+                                        phoneNo: { type: "string", example: "+919876543210" },
+                                    },
+                                },
+                                busId: {
+                                    type: "object",
+                                    description: "Populated bus details",
+                                    properties: {
+                                        busName:       { type: "string", example: "KPN Volvo Multi-Axle" },
+                                        busNumber:     { type: "string", example: "TN01KPN001" },
+                                        busType:       { type: "string", example: "AC_SLEEPER" },
+                                        seatLayoutType:{ type: "string", example: "2+1_SLEEPER" },
+                                        operatorName:  { type: "string", example: "KPN Travels" },
+                                    },
+                                },
+                                routeId: {
+                                    type: "object",
+                                    description: "Populated route details",
+                                    properties: {
+                                        source:      { $ref: "#/components/schemas/LocationItem" },
+                                        destination: { $ref: "#/components/schemas/LocationItem" },
+                                        distanceInKm: { type: "number", example: 350 },
+                                        estimatedDurationInMinutes: { type: "integer", example: 390 },
+                                    },
+                                },
+                                scheduleId: {
+                                    type: "object",
+                                    description: "Populated schedule snapshot",
+                                    properties: {
+                                        departureDate: { type: "string", format: "date-time" },
+                                        departureTime: { type: "string", example: "22:00" },
+                                        arrivalTime:   { type: "string", example: "04:30" },
+                                        baseFare:      { type: "number", example: 875 },
+                                    },
+                                },
+                                boardingPoint: {
+                                    type: "object",
+                                    description: "Snapshotted boarding stop chosen at booking",
+                                    properties: {
+                                        city:    { type: "string", example: "Chennai" },
+                                        name:    { type: "string", example: "Koyambedu Bus Stand" },
+                                        address: { type: "string", example: "Koyambedu, Chennai - 600107" },
+                                        time:    { type: "string", example: "22:00" },
+                                    },
+                                },
+                                droppingPoint: {
+                                    type: "object",
+                                    description: "Snapshotted dropping stop chosen at booking",
+                                    properties: {
+                                        city:    { type: "string", example: "Coimbatore" },
+                                        name:    { type: "string", example: "Gandhipuram Bus Stand" },
+                                        address: { type: "string", example: "Gandhipuram, Coimbatore - 641012" },
+                                        time:    { type: "string", example: "06:00" },
+                                    },
+                                },
+                                passengerDetails: {
+                                    type: "array",
+                                    items: { $ref: "#/components/schemas/PassengerDetail" },
+                                },
+                                cancellationPolicy: {
+                                    type: "array",
+                                    items: { $ref: "#/components/schemas/CancellationTier" },
+                                    description: "Policy snapshot at time of booking — immutable even if operator changes it later",
+                                },
+                            },
+                        },
+                    },
+                },
+
+                // ── Download Ticket ──────────────────────────────────────
+                //
+                // GET /api/v1/bookings/:bookingId/download-ticket
+                //
+                // The actual HTTP response is application/pdf (binary).
+                // This schema documents the *behaviour* and side-effects for
+                // Swagger UI users who cannot render a PDF inline.
+                //
+                // EMAIL SIDE-EFFECT (on booking confirmation via /payments/verify):
+                //   A PDF ticket is automatically generated and emailed to the
+                //   user as an attachment named "Payanam-Ticket-PAY-XXXXXX.pdf".
+                //   The email body contains a brief summary card; the full
+                //   boarding pass is in the attachment.
+                //
+                TicketDownloadInfo: {
+                    type: "object",
+                    description:
+                        "Metadata returned when the ticket download fails validation. " +
+                        "On success the response is a raw `application/pdf` binary stream " +
+                        "(Content-Disposition: attachment). " +
+                        "A PDF is also automatically emailed to the passenger on booking confirmation.",
+                    properties: {
+                        bookingId: {
+                            type: "string",
+                            example: "PAY-A3F2B1",
+                            description: "PNR of the booking whose ticket was requested",
+                        },
+                        fileName: {
+                            type: "string",
+                            example: "Payanam-Ticket-PAY-A3F2B1.pdf",
+                            description: "File name set in Content-Disposition header",
+                        },
+                        contentType: {
+                            type: "string",
+                            example: "application/pdf",
+                        },
+                        emailSentTo: {
+                            type: "string",
+                            format: "email",
+                            example: "santhosh@example.com",
+                            description:
+                                "The registered email address the PDF was automatically sent to " +
+                                "at the time of booking confirmation. Download is a separate on-demand call.",
+                        },
+                        note: {
+                            type: "string",
+                            example:
+                                "PDF contains: booking reference, route, bus details, departure/arrival times, " +
+                                "boarding & dropping points, passenger table, and payment reference.",
+                        },
+                    },
+                },
+
+                // ─────────────────────────────────────────────────────────
+                // PAYMENTS MODULE
+                // ─────────────────────────────────────────────────────────
+
+                // ── Request Schemas ─────────────────────────────────────
+
+                // Step 1: Frontend sends bookingMongoId → gets back a Razorpay orderId
+                CreateOrderRequest: {
+                    type: "object",
+                    required: ["bookingMongoId"],
+                    properties: {
+                        bookingMongoId: {
+                            type: "string",
+                            description: "MongoDB `_id` of the Booking document (returned by POST /api/v1/bookings as `data._id`). NOT the human-readable PAY-XXXXXX bookingId.",
+                            example: "6687a3c9f3b2e4d5c6a7b8c9",
+                        },
+                    },
+                },
+
+                // Step 2: Frontend sends Razorpay's 3 response fields + bookingMongoId
+                VerifyPaymentRequest: {
+                    type: "object",
+                    required: ["razorpayOrderId", "razorpayPaymentId", "razorpaySignature", "bookingMongoId"],
+                    properties: {
+                        razorpayOrderId: {
+                            type: "string",
+                            description: "The `id` field from the Razorpay order (returned by create-order).",
+                            example: "order_PQ5rT7xZaK3mNL",
+                        },
+                        razorpayPaymentId: {
+                            type: "string",
+                            description: "Returned by Razorpay checkout `handler` as `razorpay_payment_id`.",
+                            example: "pay_R2sT5xZaK3mNL9P",
+                        },
+                        razorpaySignature: {
+                            type: "string",
+                            description: "HMAC-SHA256 signature returned by Razorpay checkout `handler` as `razorpay_signature`. Used for tamper detection.",
+                            example: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+                        },
+                        bookingMongoId: {
+                            type: "string",
+                            description: "MongoDB `_id` of the Booking document.",
+                            example: "6687a3c9f3b2e4d5c6a7b8c9",
+                        },
+                    },
+                },
+
+                // Called by frontend when Razorpay checkout fails or user cancels
+                PaymentFailureRequest: {
+                    type: "object",
+                    required: ["razorpayOrderId", "bookingMongoId"],
+                    properties: {
+                        razorpayOrderId: {
+                            type: "string",
+                            example: "order_PQ5rT7xZaK3mNL",
+                        },
+                        errorCode: {
+                            type: "string",
+                            description: "Razorpay error code from the `payment.failed` event.",
+                            example: "BAD_REQUEST_ERROR",
+                        },
+                        errorDescription: {
+                            type: "string",
+                            description: "Human-readable reason for the failure.",
+                            example: "Payment cancelled by user",
+                        },
+                        bookingMongoId: {
+                            type: "string",
+                            example: "6687a3c9f3b2e4d5c6a7b8c9",
+                        },
+                    },
+                },
+
+                // ── Response Schemas ────────────────────────────────────
+
+                // Reusable sub-schema: compact payment record
+                PaymentRecord: {
+                    type: "object",
+                    properties: {
+                        razorpayOrderId: {
+                            type: "string",
+                            description: "Razorpay order ID — links to Razorpay dashboard.",
+                            example: "order_PQ5rT7xZaK3mNL",
+                        },
+                        razorpayPaymentId: {
+                            type: "string",
+                            nullable: true,
+                            description: "Razorpay payment ID — only present after successful verification.",
+                            example: "pay_R2sT5xZaK3mNL9P",
+                        },
+                        amount: {
+                            type: "number",
+                            description: "Amount in rupees (₹).",
+                            example: 875,
+                        },
+                        currency: {
+                            type: "string",
+                            example: "INR",
+                        },
+                        status: {
+                            type: "string",
+                            enum: ["CREATED", "SUCCESS", "FAILED", "REFUNDED"],
+                            example: "SUCCESS",
+                        },
+                        refundId: {
+                            type: "string",
+                            nullable: true,
+                            description: "Razorpay refund ID — only present after a refund is initiated.",
+                            example: "rfnd_Qa3xZ7mNL9PRTQ",
+                        },
+                        refundAmount: {
+                            type: "number",
+                            description: "Refund amount in rupees. 0 until a cancellation is processed.",
+                            example: 0,
+                        },
+                        createdAt: {
+                            type: "string",
+                            format: "date-time",
+                        },
+                    },
+                },
+
+                // Response from POST /payments/create-order
+                CreateOrderResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Razorpay order created successfully." },
+                        data: {
+                            type: "object",
+                            properties: {
+                                razorpayOrderId: {
+                                    type: "string",
+                                    description: "Pass this as `order_id` when opening Razorpay checkout.",
+                                    example: "order_PQ5rT7xZaK3mNL",
+                                },
+                                amount: {
+                                    type: "number",
+                                    description: "Amount in rupees (multiply × 100 to get paise for the Razorpay SDK).",
+                                    example: 875,
+                                },
+                                currency: { type: "string", example: "INR" },
+                                bookingMongoId: {
+                                    type: "string",
+                                    description: "Echo of the booking's MongoDB `_id`. Keep this to pass to /verify.",
+                                    example: "6687a3c9f3b2e4d5c6a7b8c9",
+                                },
+                                bookingId: {
+                                    type: "string",
+                                    description: "Human-readable PNR for display only.",
+                                    example: "PAY-A3F2B1",
+                                },
+                            },
+                        },
+                    },
+                },
+
+                // Response from POST /payments/verify
+                VerifyPaymentResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Payment verified successfully. Booking confirmed!" },
+                        data: {
+                            type: "object",
+                            properties: {
+                                booking: {
+                                    type: "object",
+                                    description: "Fully populated booking document with bus, route, and schedule details.",
+                                    properties: {
+                                        _id: { type: "string", example: "6687a3c9f3b2e4d5c6a7b8c9" },
+                                        bookingId: { type: "string", example: "PAY-A3F2B1" },
+                                        bookingStatus: { type: "string", example: "CONFIRMED" },
+                                        paymentStatus: { type: "string", example: "SUCCESS" },
+                                        paymentReference: {
+                                            type: "string",
+                                            description: "Razorpay paymentId stored as reference.",
+                                            example: "pay_R2sT5xZaK3mNL9P",
+                                        },
+                                        totalFare: { type: "number", example: 875 },
+                                        bookedSeats: { type: "array", items: { type: "string" }, example: ["L1", "L2"] },
+                                        bookedAt: { type: "string", format: "date-time" },
+                                        busId: {
+                                            type: "object",
+                                            properties: {
+                                                busName: { type: "string", example: "KPN Volvo Multi-Axle" },
+                                                busNumber: { type: "string", example: "TN01KPN001" },
+                                                busType: { type: "string", example: "AC_SLEEPER" },
+                                                operatorName: { type: "string", example: "KPN Travels" },
+                                            },
+                                        },
+                                        routeId: {
+                                            type: "object",
+                                            properties: {
+                                                source: { $ref: "#/components/schemas/LocationItem" },
+                                                destination: { $ref: "#/components/schemas/LocationItem" },
+                                            },
+                                        },
+                                        scheduleId: {
+                                            type: "object",
+                                            properties: {
+                                                departureDate: { type: "string", format: "date-time" },
+                                                departureTime: { type: "string", example: "22:00" },
+                                                arrivalTime: { type: "string", example: "04:30" },
+                                            },
+                                        },
+                                    },
+                                },
+                                payment: { $ref: "#/components/schemas/PaymentRecord" },
+                            },
+                        },
+                    },
+                },
+
+                // Response from GET /payments/status/:bookingMongoId
+                PaymentStatusResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        data: {
+                            type: "object",
+                            properties: {
+                                booking: {
+                                    type: "object",
+                                    properties: {
+                                        bookingId: { type: "string", example: "PAY-A3F2B1" },
+                                        bookingStatus: {
+                                            type: "string",
+                                            enum: ["PENDING", "CONFIRMED", "CANCELLED"],
+                                            example: "CONFIRMED",
+                                        },
+                                        paymentStatus: {
+                                            type: "string",
+                                            enum: ["PENDING", "SUCCESS", "FAILED", "REFUNDED"],
+                                            example: "SUCCESS",
+                                        },
+                                    },
+                                },
+                                payment: {
+                                    nullable: true,
+                                    description: "null if no payment has been attempted yet.",
+                                    allOf: [{ $ref: "#/components/schemas/PaymentRecord" }],
+                                },
+                            },
+                        },
+                    },
+                },
+
                 // ─────────────────────────────────────────────────────────
                 // FLIGHTS MODULE
                 // ─────────────────────────────────────────────────────────
+
 
                 // ── Shared sub-schemas ──────────────────────────────────
 
