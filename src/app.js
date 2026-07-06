@@ -7,7 +7,6 @@ import flightRouter from "./modules/flights/routes/flight.route.js";
 import airportRouter from "./modules/flights/routes/airport.routes.js";
 import bookingRouter from "./modules/bookings/routes/booking.routes.js";
 import placeRouter from "./modules/places/routes/place.routes.js";
-import hotelRouter from "./modules/hotels/routes/hotel.routes.js";
 import aiRouter from "./modules/ai/routes/ai.routes.js";
 import paymentRouter from "./modules/payments/routes/payment.routes.js";
 import cookieParser from "cookie-parser";
@@ -57,7 +56,6 @@ app.use("/api/v1/flights", flightRouter);
 app.use("/api/v1/airports", airportRouter);
 app.use("/api/v1/bookings", bookingRouter);
 app.use("/api/v1/places", placeRouter);
-app.use("/api/v1/hotels", hotelRouter);
 app.use("/api/v1/ai", aiRouter);
 app.use("/api/v1/payments", paymentRouter);
 
