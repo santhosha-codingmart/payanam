@@ -310,6 +310,7 @@ export const verifyAndConfirmPayment = async (userId, payload) => {
             amount: payment.amount,
             currency: payment.currency,
             status: payment.status,
+            createdAt: payment.createdAt,
         },
     };
 };
@@ -338,11 +339,45 @@ export const handlePaymentFailure = async (userId, payload) => {
         await payment.save();
     }
 
+    // ── Release seats back to AVAILABLE if booking is still PENDING ──────────
+    // When the booking was created, seats were marked as BOOKED in the Schedule.
+    // Since payment failed, we need to free those seats so the user (or others) can retry.
+    if (bookingMongoId) {
+        const booking = await Booking.findById(bookingMongoId);
+        if (booking && booking.bookingStatus === "PENDING") {
+            // Load the schedule to release seats
+            const schedule = await Schedule.findById(booking.scheduleId);
+            if (schedule) {
+                for (const seatNumber of booking.bookedSeats) {
+                    const seatIndex = schedule.seats.findIndex(
+                        (s) => s.seatNumber === seatNumber
+                    );
+                    if (seatIndex !== -1) {
+                        schedule.seats[seatIndex].status = "AVAILABLE";
+                        schedule.seats[seatIndex].passengerName = null;
+                        schedule.seats[seatIndex].passengerGender = null;
+                        schedule.seats[seatIndex].passengerAge = null;
+                        schedule.seats[seatIndex].bookedBy = null;
+                    }
+                }
+                // Restore available seat count
+                schedule.availableSeats += booking.bookedSeats.length;
+                await schedule.save();
+            }
+
+            // Mark the booking as CANCELLED so it doesn't linger as PENDING
+            booking.bookingStatus = "CANCELLED";
+            booking.paymentStatus = "FAILED";
+            booking.cancelledAt = new Date();
+            await booking.save();
+        }
+    }
+
     // Log for observability
     console.error(`[Payment] Failure for order ${razorpayOrderId}: [${errorCode}] ${errorDescription}`);
 
     return {
-        message: "Payment failure recorded. You can retry payment from your booking page.",
+        message: "Payment failure recorded. Seats released. You can retry booking from the search page.",
         bookingMongoId,
     };
 };

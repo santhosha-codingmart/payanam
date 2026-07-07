@@ -25,6 +25,12 @@ import {
     getVendorFlightSchedules,
     getFlightScheduleById,
 } from "../controllers/flight.controller.js";
+import {
+    createPriceLock,
+    getUserPriceLocks,
+    getPriceLockById,
+    usePriceLock,
+} from "../controllers/priceLock.controller.js";
 import { authenticate } from "../../../middleware/auth.middleware.js";
 import { authorize } from "../../../middleware/role.middleware.js";
 import { validate } from "../../../middleware/validate.middleware.js";
@@ -38,6 +44,8 @@ import {
     searchFlightSchema,
     blockSeatsSchema,
     createFlightReviewSchema,
+    createPriceLockSchema,
+    priceLockIdParamSchema,
 } from "../validators/flight.validator.js";
 
 const router = express.Router();
@@ -144,6 +152,129 @@ const router = express.Router();
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get("/search", validate(searchFlightSchema), searchFlights);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRICE LOCK — Freeze a fare for later booking (authenticated users)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/v1/flights/price-locks:
+ *   post:
+ *     summary: Create a price lock on a flight fare
+ *     description: >
+ *       Lock the current fare for a flight by paying a small, non-refundable fee.
+ *       The fare is protected for the selected duration (4h to 7d).
+ *       If the fare increases, you pay the locked fare. If it decreases, you pay the lower fare.
+ *     tags: [Flights - Price Lock]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               scheduleId:
+ *                 type: string
+ *                 example: "682abc1234567890abcd9999"
+ *               lockDurationId:
+ *                 type: string
+ *                 enum: ["4h", "8h", "12h", "1d", "3d", "7d"]
+ *     responses:
+ *       201:
+ *         description: Price locked successfully.
+ *       400:
+ *         description: Invalid duration or flight not lockable.
+ *       409:
+ *         description: User already has an active lock on this flight.
+ */
+router.post(
+    "/price-locks",
+    authenticate,
+    validate(createPriceLockSchema),
+    createPriceLock
+);
+
+/**
+ * @swagger
+ * /api/v1/flights/price-locks/my-locks:
+ *   get:
+ *     summary: Get all price locks for the logged-in user
+ *     description: Returns all price locks (active, expired, used, refunded) for the current user.
+ *     tags: [Flights - Price Lock]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: List of price locks with current fare comparison.
+ */
+router.get(
+    "/price-locks/my-locks",
+    authenticate,
+    getUserPriceLocks
+);
+
+/**
+ * @swagger
+ * /api/v1/flights/price-locks/{priceLockId}:
+ *   get:
+ *     summary: Get a specific price lock by its ID
+ *     tags: [Flights - Price Lock]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: priceLockId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: "PL-A3F2B1"
+ *     responses:
+ *       200:
+ *         description: Price lock details with fare comparison.
+ *       404:
+ *         description: Price lock not found.
+ */
+router.get(
+    "/price-locks/:priceLockId",
+    authenticate,
+    validate(priceLockIdParamSchema),
+    getPriceLockById
+);
+
+/**
+ * @swagger
+ * /api/v1/flights/price-locks/{priceLockId}/book:
+ *   post:
+ *     summary: Use a price lock to proceed with booking
+ *     description: >
+ *       Marks the price lock as USED and returns the effective fare for the booking.
+ *       The effective fare is the minimum of the locked fare and the current fare.
+ *     tags: [Flights - Price Lock]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: priceLockId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Price lock used. Proceed with booking at the effective fare.
+ *       400:
+ *         description: Lock expired or already used.
+ *       404:
+ *         description: Price lock not found.
+ */
+router.post(
+    "/price-locks/:priceLockId/book",
+    authenticate,
+    validate(priceLockIdParamSchema),
+    usePriceLock
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SEAT LAYOUT (authenticated users only — no vendor role required)

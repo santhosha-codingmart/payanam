@@ -373,7 +373,7 @@ export const getMyBookingsService = async (userId) => {
         .populate("routeId", "source destination")
         .populate("scheduleId", "departureDate departureTime arrivalTime")
         .select(
-            "bookingId bookingStatus paymentStatus totalFare bookedSeats bookedAt cancelledAt boardingPoint droppingPoint"
+            "bookingId bookingStatus paymentStatus paymentReference totalFare bookedSeats bookedAt cancelledAt boardingPoint droppingPoint passengerDetails"
         );
 
     return bookings;

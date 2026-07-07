@@ -307,3 +307,25 @@ export const createFlightReviewSchema = z.object({
         review: z.string().min(10, "Review must be at least 10 characters").max(1000),
     }),
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRICE LOCK Schemas
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Validates POST /api/v1/flights/price-locks (create a price lock)
+export const createPriceLockSchema = z.object({
+    body: z.object({
+        scheduleId: objectId,
+        lockDurationId: z.enum(["4h", "8h", "12h", "1d", "3d", "7d"], {
+            errorMap: () => ({ message: "Lock duration must be one of: 4h, 8h, 12h, 1d, 3d, 7d" }),
+        }),
+    }),
+});
+
+// Validates routes with :priceLockId URL parameter
+// E.g., GET /api/v1/flights/price-locks/:priceLockId
+export const priceLockIdParamSchema = z.object({
+    params: z.object({
+        priceLockId: z.string().min(1, "Price lock ID is required"),
+    }),
+});
