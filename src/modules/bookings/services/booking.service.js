@@ -217,7 +217,7 @@ export const createBookingService = async (userId, payload) => {
 
     // ── Calculate total fare ─────────────────────────────────────────────────
     // Sum each seat's individual fare from the Schedule's seats array
-    let totalFare = 0;
+    let baseFare = 0;
     const seatFareMap = {};
     for (const seatNumber of seatNumbers) {
         const seat = schedule.seats.find((s) => s.seatNumber === seatNumber);
@@ -226,8 +226,14 @@ export const createBookingService = async (userId, payload) => {
             throw new ApiError(409, `Seat ${seatNumber} was just booked by another user.`);
         }
         seatFareMap[seatNumber] = seat.fare || schedule.baseFare;
-        totalFare += seatFareMap[seatNumber];
+        baseFare += seatFareMap[seatNumber];
     }
+
+    // ── Apply 5% GST ────────────────────────────────────────────────────────
+    // GST is calculated on the base fare and included in the final totalFare.
+    // This ensures Razorpay charges the correct amount (base + GST).
+    const gstAmount = Math.round(baseFare * 0.05);
+    const totalFare = baseFare + gstAmount;
 
     // ── STEPS 5 & 6: MongoDB Transaction (atomic booking + seat marking) ────
     // WHY A SESSION: If the process crashes between creating the Booking and

@@ -96,6 +96,11 @@ export const createRazorpayOrder = async (userId, bookingMongoId) => {
         throw new ApiError(409, "This booking has already been paid for.");
     }
 
+    // If booking is CANCELLED, reject the request
+    if (booking.bookingStatus === "CANCELLED") {
+        throw new ApiError(409, "This booking has been cancelled. Please create a new booking.");
+    }
+
     // If there's already a CREATED payment for this booking, return it
     // (handles browser refresh / accidental double-click on "Pay Now")
     const existingPayment = await Payment.findOne({
@@ -111,6 +116,9 @@ export const createRazorpayOrder = async (userId, bookingMongoId) => {
             bookingId: booking.bookingId,
         };
     }
+
+    // ── Allow retry: if previous payment FAILED, we can create a new order ────
+    // No need to do anything special — just proceed to create a new Razorpay order below.
 
     // ── 3. Create the Razorpay order ─────────────────────────────────────────
     // receipt → a short reference visible in the Razorpay dashboard
@@ -336,49 +344,23 @@ export const handlePaymentFailure = async (userId, payload) => {
     const payment = await Payment.findOne({ razorpayOrderId });
     if (payment && payment.status === "CREATED") {
         payment.status = "FAILED";
+        payment.failureReason = errorDescription || errorCode;
         await payment.save();
     }
 
-    // ── Release seats back to AVAILABLE if booking is still PENDING ──────────
-    // When the booking was created, seats were marked as BOOKED in the Schedule.
-    // Since payment failed, we need to free those seats so the user (or others) can retry.
-    if (bookingMongoId) {
-        const booking = await Booking.findById(bookingMongoId);
-        if (booking && booking.bookingStatus === "PENDING") {
-            // Load the schedule to release seats
-            const schedule = await Schedule.findById(booking.scheduleId);
-            if (schedule) {
-                for (const seatNumber of booking.bookedSeats) {
-                    const seatIndex = schedule.seats.findIndex(
-                        (s) => s.seatNumber === seatNumber
-                    );
-                    if (seatIndex !== -1) {
-                        schedule.seats[seatIndex].status = "AVAILABLE";
-                        schedule.seats[seatIndex].passengerName = null;
-                        schedule.seats[seatIndex].passengerGender = null;
-                        schedule.seats[seatIndex].passengerAge = null;
-                        schedule.seats[seatIndex].bookedBy = null;
-                    }
-                }
-                // Restore available seat count
-                schedule.availableSeats += booking.bookedSeats.length;
-                await schedule.save();
-            }
-
-            // Mark the booking as CANCELLED so it doesn't linger as PENDING
-            booking.bookingStatus = "CANCELLED";
-            booking.paymentStatus = "FAILED";
-            booking.cancelledAt = new Date();
-            await booking.save();
-        }
-    }
+    // ── Keep booking as PENDING for retry ──────────────────────────────────────
+    // The booking stays PENDING so the user can retry payment.
+    // Seats remain reserved in the Schedule (marked as BOOKED).
+    // A cron job or TTL will eventually clean up abandoned PENDING bookings.
+    // We do NOT release seats here — the user may want to retry.
 
     // Log for observability
     console.error(`[Payment] Failure for order ${razorpayOrderId}: [${errorCode}] ${errorDescription}`);
 
     return {
-        message: "Payment failure recorded. Seats released. You can retry booking from the search page.",
+        message: "Payment failure recorded. You can retry payment for this booking.",
         bookingMongoId,
+        canRetry: true,
     };
 };
 
