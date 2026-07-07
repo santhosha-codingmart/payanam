@@ -2,6 +2,7 @@ import app from "./app.js";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import "./config/redis.js";
+import logger from "./config/logger.js";
 import { bulkUpsertCities, initCityCache } from "./modules/places/services/city.service.js";
 import { bulkUpsertAirports, initAirportCache } from "./modules/flights/services/airport.service.js";
 import { createRequire } from "module";
@@ -153,28 +154,31 @@ async function start() {
         }));
 
         await bulkUpsertCities(citiesPayload);
-        console.log(`🌆 Cities seeded successfully from JSON`);
+        logger.info("Cities seeded successfully from JSON");
     } catch (err) {
-        console.error("[Startup] City seed warning:", err.message);
+        logger.warn("City seed warning — falling back to cache", { error: err.message });
         await initCityCache();
     }
 
     try {
         const airportsJson = require("./modules/flights/data/airports.json");
         await bulkUpsertAirports(airportsJson);
-        console.log(`✈️  Airports seeded successfully from JSON`);
+        logger.info("Airports seeded successfully from JSON");
     } catch (err) {
-        console.error("[Startup] Airport seed warning:", err.message);
+        logger.warn("Airport seed warning — falling back to cache", { error: err.message });
         await initAirportCache();
     }
 
     app.listen(process.env.PORT, () => {
-        console.log(`The server is running at the port: ${process.env.PORT}`);
+        logger.info(`Payanam API running on port ${process.env.PORT}`, {
+            port: process.env.PORT,
+            env:  process.env.NODE_ENV || "development",
+        });
     });
 }
 
 start().catch((err) => {
-    console.error("Failed to start server:", err);
+    logger.error("Fatal: failed to start server", { error: err.message, stack: err.stack });
     process.exit(1);
 });
 

@@ -1,2 +1,6 @@
 .env
 node_modules
+
+# Log files (generated at runtime)
+logs/
+*.log
