@@ -1,4 +1,5 @@
 import express from "express";
+import helmet from "helmet";
 import morgan from "morgan";
 import swaggerUi from "swagger-ui-express";
 import router from "./modules/auth/routes/local-auth.routes.js";
@@ -26,6 +27,7 @@ import {
     adminLimiter,
 } from "./config/rateLimiter.js";
 
+
 dotenv.config();
 
 const app = express();
@@ -44,6 +46,9 @@ app.use(
 
 app.use(express.json());
 app.use(cookieParser());
+// Note: express-mongo-sanitize removed — incompatible with Express 5 (read-only req.query).
+// MongoDB injection is handled by Zod strict schema validation on all routes,
+// which rejects unexpected keys like $gt, $where, $regex before they reach MongoDB.
 
 // ── HTTP Request Logger (morgan → winston) ─────────────────────────────────────
 // morgan formats each request as a single line and pipes it into our logger.

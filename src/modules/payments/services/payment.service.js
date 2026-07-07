@@ -50,6 +50,7 @@ import redis from "../../../config/redis.js";
 import { ApiError } from "../../../utils/ApiError.js";
 import { sendBookingConfirmationEmail } from "../../../utils/email.service.js";
 import { generateTicketPDF } from "../../../utils/ticket.pdf.service.js";
+import logger from "../../../config/logger.js";
 
 // ── Razorpay client (singleton) ───────────────────────────────────────────────
 // Initialised once at module load. key_id and key_secret come from .env.
@@ -199,8 +200,7 @@ export const verifyAndConfirmPayment = async (userId, payload) => {
         .digest("hex");
 
     if (expectedSignature !== razorpaySignature) {
-        // Log this — it could be a replay attack or data corruption
-        console.error(`[Payment] Signature mismatch for order ${razorpayOrderId}`);
+        logger.error("Payment signature mismatch", { razorpayOrderId });
         throw new ApiError(400, "Payment verification failed. Invalid signature.");
     }
 
@@ -259,7 +259,7 @@ export const verifyAndConfirmPayment = async (userId, payload) => {
         }
     } catch (redisErr) {
         // Non-fatal — Redis TTL will clean up. Log but don't fail the request.
-        console.error("[Payment] Redis cleanup error (non-fatal):", redisErr.message);
+        logger.warn("Redis seat lock cleanup error (non-fatal)", { error: redisErr.message });
     }
 
     // ── 6. Return confirmed booking details ───────────────────────────────────
@@ -307,7 +307,7 @@ export const verifyAndConfirmPayment = async (userId, payload) => {
             pdfBuffer,   // ← attached to email as PDF
         });
     } catch (emailErr) {
-        console.error("[Payment] Confirmation email error (non-fatal):", emailErr.message);
+        logger.warn("Booking confirmation email error (non-fatal)", { error: emailErr.message });
     }
 
     return {
@@ -355,7 +355,7 @@ export const handlePaymentFailure = async (userId, payload) => {
     // We do NOT release seats here — the user may want to retry.
 
     // Log for observability
-    console.error(`[Payment] Failure for order ${razorpayOrderId}: [${errorCode}] ${errorDescription}`);
+    logger.warn("Payment failure recorded", { razorpayOrderId, errorCode, errorDescription });
 
     return {
         message: "Payment failure recorded. You can retry payment for this booking.",
@@ -390,8 +390,7 @@ export const initiateRefund = async (bookingMongoId, refundAmount) => {
     });
 
     if (!payment || !payment.razorpayPaymentId) {
-        // No real payment to refund (mock payment or payment not found)
-        console.warn(`[Refund] No Razorpay payment found for booking ${bookingMongoId}. Skipping Razorpay refund.`);
+        logger.warn("No Razorpay payment found for refund — skipping", { bookingMongoId });
         return null;
     }
 
@@ -417,9 +416,12 @@ export const initiateRefund = async (bookingMongoId, refundAmount) => {
 
         return razorpayRefund;
     } catch (razorpayErr) {
-        // Log but don't crash the cancellation — the booking is cancelled regardless
-        // A human/cron can retry the refund using the Payment doc's bookingId
-        console.error(`[Refund] Razorpay refund API error for payment ${payment.razorpayPaymentId}:`, razorpayErr);
+        // Log but don't crash the cancellation — the booking is cancelled regardless.
+        // A human or cron job can retry the refund using the Payment doc's bookingId.
+        logger.error("Razorpay refund API error", {
+            razorpayPaymentId: payment.razorpayPaymentId,
+            error: razorpayErr.message,
+        });
         return null;
     }
 };

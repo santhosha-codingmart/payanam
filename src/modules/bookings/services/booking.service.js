@@ -24,6 +24,7 @@ import { initiateRefund } from "../../payments/services/payment.service.js";
 import { sendBookingCancellationEmail } from "../../../utils/email.service.js";
 import User from "../../users/models/user.model.js";
 import { generateTicketPDF } from "../../../utils/ticket.pdf.service.js";
+import logger from "../../../config/logger.js";
 
 // =============================================================================
 // LADIES SEAT PROTECTION — Helper
@@ -500,32 +501,48 @@ export const cancelBookingService = async (userId, bookingId) => {
     // 4. Calculate refund ─────────────────────────────────────────────────────
     const refundAmount = calculateRefund(booking);
 
-    // 5. Release seats back to AVAILABLE ──────────────────────────────────────
-    const schedule = await Schedule.findById(booking.scheduleId);
-    if (schedule) {
-        for (const seatNumber of booking.bookedSeats) {
-            const seatIndex = schedule.seats.findIndex(
-                (s) => s.seatNumber === seatNumber
-            );
-            if (seatIndex !== -1) {
-                schedule.seats[seatIndex].status = "AVAILABLE";
-                schedule.seats[seatIndex].passengerName = null;
+    // 5 & 6. Atomic transaction: release seats + cancel booking ───────────────
+    // WHY A TRANSACTION:
+    //   If the server crashes after releasing seats but before marking the booking
+    //   as CANCELLED, users would have their money deducted but the booking would
+    //   still show CONFIRMED and seats would be free — corrupt state.
+    //   A transaction ensures both writes succeed or both roll back together.
+    const session = await mongoose.startSession();
+    try {
+        await session.withTransaction(async () => {
+            // 5. Release seats back to AVAILABLE in the Schedule
+            const schedule = await Schedule.findById(booking.scheduleId).session(session);
+            if (schedule) {
+                for (const seatNumber of booking.bookedSeats) {
+                    const seatIndex = schedule.seats.findIndex(
+                        (s) => s.seatNumber === seatNumber
+                    );
+                    if (seatIndex !== -1) {
+                        schedule.seats[seatIndex].status          = "AVAILABLE";
+                        schedule.seats[seatIndex].passengerName   = null;
+                        schedule.seats[seatIndex].passengerGender = null;
+                        schedule.seats[seatIndex].passengerAge    = null;
+                        schedule.seats[seatIndex].bookedBy        = null;
+                    }
+                }
+                schedule.availableSeats += booking.bookedSeats.length;
+                await schedule.save({ session });
             }
-        }
-        schedule.availableSeats += booking.bookedSeats.length;
-        await schedule.save();
+
+            // 6. Mark the booking as CANCELLED
+            booking.bookingStatus = "CANCELLED";
+            booking.paymentStatus = refundAmount > 0 ? "REFUNDED" : "SUCCESS";
+            booking.refundAmount  = refundAmount;
+            booking.cancelledAt   = new Date();
+            await booking.save({ session });
+        });
+    } finally {
+        session.endSession();
     }
 
-    // 6. Update booking document ───────────────────────────────────────────────
-    booking.bookingStatus = "CANCELLED";
-    booking.paymentStatus = refundAmount > 0 ? "REFUNDED" : "SUCCESS"; // No refund = payment still succeeded
-    booking.refundAmount = refundAmount;
-    booking.cancelledAt = new Date();
-    await booking.save();
-
     // 7. Initiate Razorpay refund (if applicable) ─────────────────────────────
-    // This calls Razorpay's refund API using the paymentId stored in the Payment doc.
-    // Non-blocking: a failure here does NOT roll back the cancellation.
+    // Runs OUTSIDE the transaction — a Razorpay API failure should not roll
+    // back the cancellation. If this fails, an admin can retry via the Payment doc.
     if (refundAmount > 0) {
         await initiateRefund(booking._id, refundAmount);
     }
@@ -561,7 +578,7 @@ export const cancelBookingService = async (userId, bookingId) => {
             });
         }
     } catch (emailErr) {
-        console.error("[Booking] Cancellation email error (non-fatal):", emailErr.message);
+        logger.warn("Cancellation email error (non-fatal)", { error: emailErr.message, bookingId: booking.bookingId });
     }
 
     return {

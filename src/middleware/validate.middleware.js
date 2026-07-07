@@ -6,11 +6,17 @@ import { ZodError } from 'zod';
 export const validate = (schema) => async (req, res, next) => {
     try {
         // We tell Zod to check the req.body, req.query, and req.params against our rules
-        await schema.parseAsync({
-            body: req.body,
-            query: req.query,
-            params: req.params,
-        });
+        // Deep-clone all req data into plain objects before passing to Zod.
+        // Zod v4 internally attaches metadata (_zod) to the input objects during
+        // parsing. Express 5 makes req.query and req.params read-only getters
+        // (and req.body can be a complex object), so we clone everything first
+        // to give Zod a plain, mutable copy.
+        const data = JSON.parse(JSON.stringify({
+            body:   req.body   ?? {},
+            query:  req.query  ?? {},
+            params: req.params ?? {},
+        }));
+        await schema.parseAsync(data);
 
         // Data is perfect! Hand the baton to the next controller.
         return next();
