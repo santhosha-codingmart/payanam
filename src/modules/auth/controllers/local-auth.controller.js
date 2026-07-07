@@ -1,6 +1,7 @@
 import {
   registerByEmail,
   registerVendorByEmail,
+  registerAdminByEmail,
   loginByEmail,
   requestPasswordReset,
   verifyAndResetPassword,
@@ -71,6 +72,37 @@ export const registerVendor = async (req, res, next) => {
         email: vendor.email,
         role: vendor.role,         // "vendor" — useful for frontend redirect
         companyName: vendor.companyName,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// =============================================================================
+// POST /api/auth/register-admin
+// Creates an admin account. Requires a secret admin key for authorization.
+// Role is set server-side — never accepted from client.
+// =============================================================================
+export const registerAdmin = async (req, res, next) => {
+  try {
+    const admin = await registerAdminByEmail(req.body);
+    const accessToken = generateAccessToken(admin);
+    const refreshToken = generateRefreshToken(admin);
+
+    await RefreshToken.create({ userId: admin._id, token: refreshToken });
+
+    res.cookie("accessToken", accessToken, cookieOptions(15 * 60 * 1000));
+    res.cookie("refreshToken", refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000));
+
+    return res.status(201).json({
+      success: true,
+      message: "Admin registered successfully. Welcome to Payanam!",
+      user: {
+        id: admin._id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role,         // "admin" — used for frontend redirect
       },
     });
   } catch (error) {

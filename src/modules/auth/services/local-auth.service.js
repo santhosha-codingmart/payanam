@@ -32,6 +32,47 @@ export const registerByEmail = async (userData) => {
 }
 
 // =============================================================================
+// ADMIN REGISTRATION
+// =============================================================================
+//
+// Requires a secret admin key (ADMIN_SECRET_KEY env variable) to prevent
+// unauthorized admin account creation. The client sends the key along with
+// the registration data. Role is hard-coded to "admin" server-side.
+//
+// =============================================================================
+export const registerAdminByEmail = async (userData) => {
+    const { name, email, password, adminSecretKey } = userData;
+
+    // Verify the admin secret key
+    if (!adminSecretKey || adminSecretKey !== process.env.ADMIN_SECRET_KEY) {
+        throw new ApiError(403, "Invalid admin secret key. Registration denied.");
+    }
+
+    // Uniqueness checks
+    if (await User.findOne({ email })) {
+        throw new ApiError(409, "This email is already registered.");
+    }
+
+    // Check if there's already an admin (optional: limit to one admin)
+    // Uncomment if you want only one admin account
+    // if (await User.findOne({ role: "admin" })) {
+    //     throw new ApiError(409, "An admin account already exists.");
+    // }
+
+    const hashedPassword = await bCyrpt.hash(password, 10);
+
+    const admin = await User.create({
+        name,
+        email,
+        password: hashedPassword,
+        role: "admin",           // ← server assigns this, never the client
+        authProvider: "local",
+    });
+
+    return admin;
+};
+
+// =============================================================================
 // VENDOR REGISTRATION
 // =============================================================================
 //

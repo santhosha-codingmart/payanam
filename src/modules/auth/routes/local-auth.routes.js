@@ -5,6 +5,7 @@ import {
     refresh,
     register,
     registerVendor,
+    registerAdmin,
     forgotPassword,
     resetPasswordController,
     sendMobileOTPController,
@@ -17,6 +18,7 @@ import {
     loginSchema,
     registerSchema,
     registerVendorSchema,
+    registerAdminSchema,
     forgotPasswordSchema,
     resetPasswordSchema,
     sendMobileOTPSchema,
@@ -129,6 +131,69 @@ let router = express.Router();
  *               message: "This email is already registered."
  */
 router.post('/register-vendor', validate(registerVendorSchema), registerVendor);
+
+/**
+ * @swagger
+ * /api/auth/register-admin:
+ *   post:
+ *     summary: Register a new admin account
+ *     description: >
+ *       Creates an admin account with `role: "admin"` automatically assigned
+ *       by the server. Requires a valid admin secret key (ADMIN_SECRET_KEY env variable)
+ *       to prevent unauthorized admin account creation.
+ *
+ *       After registration, the admin can:
+ *       - Access the admin dashboard
+ *       - Manage vendors, users, bookings
+ *       - View platform analytics
+ *     tags: [Auth - Email]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, email, password, adminSecretKey]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Admin User"
+ *                 description: "Full name of the admin"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "admin@payanam.com"
+ *               password:
+ *                 type: string
+ *                 example: "SecurePass@123"
+ *                 description: "Min 8 chars, must have uppercase, lowercase, digit, special char"
+ *               adminSecretKey:
+ *                 type: string
+ *                 example: "your-secret-admin-key"
+ *                 description: "Secret key from ADMIN_SECRET_KEY env variable"
+ *     responses:
+ *       201:
+ *         description: Admin registered. Auth cookies set.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *             example:
+ *               success: true
+ *               message: "Admin registered successfully. Welcome to Payanam!"
+ *               user:
+ *                 id: "665f1a2b3c4d5e6f7a8b9c0d"
+ *                 name: "Admin User"
+ *                 email: "admin@payanam.com"
+ *                 role: "admin"
+ *       400:
+ *         description: Validation error
+ *       403:
+ *         description: Invalid admin secret key
+ *       409:
+ *         description: Email already registered
+ */
+router.post('/register-admin', validate(registerAdminSchema), registerAdmin);
 
 /**
  * @swagger

@@ -70,6 +70,17 @@ export const registerVendorSchema = z.object({
     })
 });
 
+// ── Admin Registration ────────────────────────────────────────────────────────
+
+export const registerAdminSchema = z.object({
+    body: z.object({
+        name: z.string().min(2, "Name must be at least 2 characters"),
+        email: z.string().email({ message: "Invalid email address format" }),
+        password: strongPassword,
+        adminSecretKey: z.string().min(1, "Admin secret key is required"),
+    })
+});
+
 // ── Mobile OTP Auth ───────────────────────────────────────────────────────────
 
 export const sendMobileOTPSchema = z.object({
