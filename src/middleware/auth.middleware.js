@@ -41,10 +41,18 @@ export const authenticate = async (req, res, next) => {
             });
         }
 
-        // 4. Attach the user document to the request object
+        // 4b. Check if the account has been banned by an admin
+        if (user.isActive === false) {
+            return res.status(403).json({
+                success: false,
+                message: "Your account has been suspended. Please contact support."
+            });
+        }
+
+        // 5. Attach the user document to the request object
         req.user = user;
 
-        // 5. Pass control to the next middleware/controller
+        // 6. Pass control to the next middleware/controller
         return next();
 
     } catch (error) {

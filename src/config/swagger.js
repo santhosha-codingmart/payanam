@@ -1796,6 +1796,322 @@ const options = {
                     },
                 },
 
+                // ── Admin Module ─────────────────────────────────────────────
+
+                AdminDashboardResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Admin dashboard fetched successfully." },
+                        data: {
+                            type: "object",
+                            properties: {
+                                users: {
+                                    type: "object",
+                                    properties: {
+                                        total: { type: "integer", example: 1240 },
+                                        totalVendors: { type: "integer", example: 38 },
+                                        pendingVendorApprovals: { type: "integer", example: 5 },
+                                    },
+                                },
+                                buses: {
+                                    type: "object",
+                                    properties: {
+                                        total: { type: "integer", example: 95 },
+                                        active: { type: "integer", example: 88 },
+                                        inactive: { type: "integer", example: 7 },
+                                    },
+                                },
+                                routes: {
+                                    type: "object",
+                                    properties: {
+                                        active: { type: "integer", example: 120 },
+                                    },
+                                },
+                                bookings: {
+                                    type: "object",
+                                    properties: {
+                                        total: { type: "integer", example: 8400 },
+                                        confirmed: { type: "integer", example: 7900 },
+                                        cancelled: { type: "integer", example: 500 },
+                                        thisMonth: { type: "integer", example: 340 },
+                                    },
+                                },
+                                revenue: {
+                                    type: "object",
+                                    properties: {
+                                        total: { type: "number", example: 6850000 },
+                                        thisMonth: { type: "number", example: 290000 },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+
+                AdminUserObject: {
+                    type: "object",
+                    properties: {
+                        _id: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0d" },
+                        name: { type: "string", example: "Santhosh Kumar" },
+                        email: { type: "string", format: "email", example: "santhosh@example.com" },
+                        phoneNo: { type: "string", nullable: true, example: "+919876543210" },
+                        role: { type: "string", enum: ["user", "vendor", "admin"], example: "user" },
+                        isActive: { type: "boolean", example: true },
+                        isEmailVerified: { type: "boolean", example: true },
+                        vendorApprovalStatus: {
+                            type: "string",
+                            enum: ["PENDING", "APPROVED", "REJECTED"],
+                            nullable: true,
+                            example: "APPROVED",
+                        },
+                        companyName: { type: "string", nullable: true, example: "KPN Travels" },
+                        gstNumber: { type: "string", nullable: true, example: "33AABCP1234A1ZX" },
+                        createdAt: { type: "string", format: "date-time" },
+                        updatedAt: { type: "string", format: "date-time" },
+                    },
+                },
+
+                AdminUserListResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Users fetched successfully." },
+                        data: {
+                            type: "object",
+                            properties: {
+                                users: {
+                                    type: "array",
+                                    items: { $ref: "#/components/schemas/AdminUserObject" },
+                                },
+                                pagination: {
+                                    type: "object",
+                                    properties: {
+                                        totalCount: { type: "integer", example: 1240 },
+                                        totalPages: { type: "integer", example: 62 },
+                                        currentPage: { type: "integer", example: 1 },
+                                        limit: { type: "integer", example: 20 },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+
+                AdminToggleActiveResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "User account has been banned." },
+                        data: {
+                            type: "object",
+                            properties: {
+                                userId: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0d" },
+                                name: { type: "string", example: "Santhosh Kumar" },
+                                email: { type: "string", example: "santhosh@example.com" },
+                                isActive: { type: "boolean", example: false },
+                            },
+                        },
+                    },
+                },
+
+                AdminChangeRoleRequest: {
+                    type: "object",
+                    required: ["role"],
+                    properties: {
+                        role: {
+                            type: "string",
+                            enum: ["user", "vendor"],
+                            example: "vendor",
+                        },
+                    },
+                },
+
+                AdminVendorApproveResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Vendor approved successfully." },
+                        data: {
+                            type: "object",
+                            properties: {
+                                vendorId: { type: "string", example: "665f1a2b3c4d5e6f7a8b9c0d" },
+                                name: { type: "string", example: "Parveen Kumar" },
+                                email: { type: "string", example: "parveen@example.com" },
+                                companyName: { type: "string", example: "KPN Travels" },
+                                vendorApprovalStatus: { type: "string", example: "APPROVED" },
+                            },
+                        },
+                    },
+                },
+
+                AdminVendorRejectRequest: {
+                    type: "object",
+                    properties: {
+                        reason: { type: "string", example: "Incomplete business documentation." },
+                    },
+                },
+
+                AdminVendorStatsResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Vendor stats fetched successfully." },
+                        data: {
+                            type: "object",
+                            properties: {
+                                vendor: {
+                                    type: "object",
+                                    properties: {
+                                        id: { type: "string" },
+                                        name: { type: "string", example: "Parveen Kumar" },
+                                        email: { type: "string", example: "parveen@example.com" },
+                                        companyName: { type: "string", example: "KPN Travels" },
+                                        gstNumber: { type: "string", nullable: true },
+                                        vendorApprovalStatus: { type: "string", example: "APPROVED" },
+                                        isActive: { type: "boolean", example: true },
+                                        joinedAt: { type: "string", format: "date-time" },
+                                    },
+                                },
+                                stats: {
+                                    type: "object",
+                                    properties: {
+                                        buses: {
+                                            type: "object",
+                                            properties: {
+                                                total: { type: "integer", example: 8 },
+                                                active: { type: "integer", example: 7 },
+                                            },
+                                        },
+                                        bookings: {
+                                            type: "object",
+                                            properties: {
+                                                total: { type: "integer", example: 342 },
+                                                confirmed: { type: "integer", example: 310 },
+                                            },
+                                        },
+                                        revenue: { type: "number", example: 275000 },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+
+                AdminBusListResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Buses fetched successfully." },
+                        data: {
+                            type: "object",
+                            properties: {
+                                buses: {
+                                    type: "array",
+                                    items: {
+                                        type: "object",
+                                        properties: {
+                                            _id: { type: "string" },
+                                            busName: { type: "string", example: "KPN Volvo Multi-Axle" },
+                                            busNumber: { type: "string", example: "TN01KPN001" },
+                                            busType: { type: "string", example: "AC_SLEEPER" },
+                                            operatorName: { type: "string", example: "KPN Travels" },
+                                            status: { type: "string", example: "ACTIVE" },
+                                            totalSeats: { type: "integer", example: 36 },
+                                            averageRating: { type: "number", example: 4.5 },
+                                            createdAt: { type: "string", format: "date-time" },
+                                        },
+                                    },
+                                },
+                                pagination: {
+                                    type: "object",
+                                    properties: {
+                                        totalCount: { type: "integer", example: 95 },
+                                        totalPages: { type: "integer", example: 5 },
+                                        currentPage: { type: "integer", example: 1 },
+                                        limit: { type: "integer", example: 20 },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+
+                AdminToggleBusResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Bus status changed to INACTIVE." },
+                        data: {
+                            type: "object",
+                            properties: {
+                                busId: { type: "string" },
+                                busName: { type: "string", example: "KPN Volvo Multi-Axle" },
+                                busNumber: { type: "string", example: "TN01KPN001" },
+                                status: { type: "string", enum: ["ACTIVE", "INACTIVE"], example: "INACTIVE" },
+                            },
+                        },
+                    },
+                },
+
+                AdminBookingListResponse: {
+                    type: "object",
+                    properties: {
+                        success: { type: "boolean", example: true },
+                        message: { type: "string", example: "Bookings fetched successfully." },
+                        data: {
+                            type: "object",
+                            properties: {
+                                bookings: {
+                                    type: "array",
+                                    items: {
+                                        type: "object",
+                                        properties: {
+                                            bookingId: { type: "string", example: "PAY-A3F2B1" },
+                                            bookingStatus: { type: "string", enum: ["PENDING", "CONFIRMED", "CANCELLED"], example: "CONFIRMED" },
+                                            paymentStatus: { type: "string", example: "SUCCESS" },
+                                            totalFare: { type: "number", example: 1750 },
+                                            bookedSeats: { type: "array", items: { type: "string" }, example: ["L1", "L2"] },
+                                            bookedAt: { type: "string", format: "date-time" },
+                                            userId: {
+                                                type: "object",
+                                                properties: {
+                                                    name: { type: "string", example: "Santhosh Kumar" },
+                                                    email: { type: "string", example: "santhosh@example.com" },
+                                                },
+                                            },
+                                            busId: {
+                                                type: "object",
+                                                properties: {
+                                                    busName: { type: "string", example: "KPN Volvo Multi-Axle" },
+                                                    busNumber: { type: "string", example: "TN01KPN001" },
+                                                    operatorName: { type: "string", example: "KPN Travels" },
+                                                },
+                                            },
+                                            routeId: {
+                                                type: "object",
+                                                properties: {
+                                                    source: { $ref: "#/components/schemas/LocationItem" },
+                                                    destination: { $ref: "#/components/schemas/LocationItem" },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                                pagination: {
+                                    type: "object",
+                                    properties: {
+                                        totalCount: { type: "integer", example: 8400 },
+                                        totalPages: { type: "integer", example: 420 },
+                                        currentPage: { type: "integer", example: 1 },
+                                        limit: { type: "integer", example: 20 },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+
             }, // ← closes schemas — DO NOT REMOVE
 
             // ── Cookie-based JWT auth (accessToken) ────────────────────────

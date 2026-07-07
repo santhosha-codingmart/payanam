@@ -70,7 +70,23 @@ let userSchema = mongoose.Schema({
     profileImage: {
         type: String,
         default: null
-    }
+    },
+
+    // ── Vendor Approval ────────────────────────────────────────────────────────
+    // Only relevant when role === "vendor".
+    // Admins approve or reject vendor registrations before they can list buses/flights.
+    vendorApprovalStatus: {
+        type: String,
+        enum: ["PENDING", "APPROVED", "REJECTED"],
+        default: "PENDING",
+    },
+
+    // ── Account Status ────────────────────────────────────────────────────────
+    // Admin can ban/unban any user account.
+    isActive: {
+        type: Boolean,
+        default: true,
+    },
 }, {
     timestamps: true
 });

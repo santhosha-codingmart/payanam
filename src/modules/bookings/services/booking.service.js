@@ -545,10 +545,10 @@ export const cancelBookingService = async (userId, bookingId) => {
             await sendBookingCancellationEmail(user.email, {
                 bookingId:     booking.bookingId,
                 userName:      user.name,
-                source:        routeDoc?.source      || "—",
-                destination:   routeDoc?.destination || "—",
+                source:        routeDoc?.source?.city      || "N/A",
+                destination:   routeDoc?.destination?.city || "N/A",
                 departureDate: depDate,
-                departureTime: scheduleDoc?.departureTime || "—",
+                departureTime: scheduleDoc?.departureTime || "N/A",
                 totalFare:     booking.totalFare,
                 refundAmount,
                 cancelledAt:   booking.cancelledAt,
