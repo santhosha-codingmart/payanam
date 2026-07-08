@@ -570,10 +570,11 @@ export const blockSeatsService = async (userId, scheduleId, seatNumbers) => {
     const TTL_SECONDS = 600; // 10 minutes — enough time to complete payment
     const pipeline = redis.pipeline();
 
+    // Lock individual seats (for conflict detection between users)
     for (const seatNumber of validSeats) {
-        const lockKey = `flight_seat_lock:${scheduleId}:${seatNumber}`;
+        const seatLockKey = `flight_seat_lock:${scheduleId}:${seatNumber}`;
         // SET key value EX ttl — stores the userId as the lock owner
-        pipeline.set(lockKey, userId.toString(), "EX", TTL_SECONDS);
+        pipeline.set(seatLockKey, userId.toString(), "EX", TTL_SECONDS);
 
         // Also update the Mongoose document so the UI reflects BLOCKED immediately
         const seatIndex = schedule.seats.findIndex((s) => s.seatNumber === seatNumber);
@@ -581,6 +582,11 @@ export const blockSeatsService = async (userId, scheduleId, seatNumbers) => {
             schedule.seats[seatIndex].status = "BLOCKED";
         }
     }
+
+    // Create a user-level lock that stores all locked seats for this user+schedule
+    // This is what the booking service checks to verify the user has locked these seats
+    const userLockKey = `flight_lock:${scheduleId}:${userId}`;
+    pipeline.set(userLockKey, JSON.stringify(validSeats), "EX", TTL_SECONDS);
 
     await pipeline.exec();
     await schedule.save();
