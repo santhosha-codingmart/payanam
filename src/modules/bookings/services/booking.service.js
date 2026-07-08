@@ -380,11 +380,11 @@ export const getMyBookingsService = async (userId) => {
     // Sorted by bookedAt descending (most recent first).
     const bookings = await Booking.find({ userId })
         .sort({ bookedAt: -1 })
-        .populate("busId", "busName busNumber busType operatorName")
+        .populate("busId", "busName busNumber busType operatorName airlineName flightNumber aircraftType")
         .populate("routeId", "source destination")
-        .populate("scheduleId", "departureDate departureTime arrivalTime")
+        .populate("scheduleId", "departureDate departureTime arrivalTime arrivalDate")
         .select(
-            "bookingId bookingStatus paymentStatus paymentReference totalFare bookedSeats bookedAt cancelledAt boardingPoint droppingPoint passengerDetails scheduleId busId routeId"
+            "bookingId bookingStatus paymentStatus paymentReference totalFare bookedSeats bookedAt travelDate cancelledAt boardingPoint droppingPoint passengerDetails scheduleId busId routeId"
         );
 
     return bookings;

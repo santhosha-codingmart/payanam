@@ -736,8 +736,16 @@ export const addFlightReviewService = async (userId, flightId, bookingId, rating
 export const createFlightBookingService = async (userId, payload) => {
     const { scheduleId, passengerDetails } = payload;
 
-    // 1. Verify the schedule exists
-    const schedule = await FlightSchedule.findById(scheduleId);
+    // 1. Verify the schedule exists and populate route/flight info
+    const schedule = await FlightSchedule.findById(scheduleId)
+        .populate({
+            path: "routeId",
+            select: "source destination stops",
+        })
+        .populate({
+            path: "flightId",
+            select: "airlineName flightNumber aircraftType",
+        });
     if (!schedule) {
         throw new ApiError(404, "Flight schedule not found.");
     }
@@ -766,22 +774,38 @@ export const createFlightBookingService = async (userId, payload) => {
         return sum + (seat.fare || schedule.baseFare);
     }, 0);
 
-    // 5. Create the booking
+    // 5. Extract boarding/dropping info from the populated route
+    const route = schedule.routeId;
+    const sourceAirport = route?.source || {};
+    const destAirport = route?.destination || {};
+
+    // 6. Create the booking with proper boarding/dropping point info
     const booking = await Booking.create({
         bookingId: `FLY-${Date.now().toString(36).toUpperCase()}`,
         userId,
         scheduleId,
         busId: schedule.flightId, // Using busId field for flightId (same schema)
         operatorId: schedule.operatorId,
-        routeId: schedule.routeId,
-        boardingPoint: { name: "Airport", city: "Terminal", time: schedule.departureTime },
-        droppingPoint: { name: "Airport", city: "Terminal", time: schedule.arrivalTime },
+        routeId: schedule.routeId?._id || schedule.routeId,
+        boardingPoint: { 
+            name: schedule.departureTerminal || sourceAirport.name || "Airport",
+            city: sourceAirport.city || "",
+            time: schedule.departureTime,
+            iata: sourceAirport.iataCode || "",
+        },
+        droppingPoint: { 
+            name: schedule.arrivalTerminal || destAirport.name || "Airport",
+            city: destAirport.city || "",
+            time: schedule.arrivalTime,
+            iata: destAirport.iataCode || "",
+        },
         passengerDetails,
         bookedSeats: passengerDetails.map(p => p.seatNumber),
         totalFare,
         bookingStatus: "PENDING",
         paymentStatus: "PENDING",
         bookedAt: new Date(),
+        travelDate: schedule.departureDate, // Store actual travel date
     });
 
     // 6. Update seat status to BOOKED

@@ -192,6 +192,10 @@ const bookingSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+        travelDate: {
+            type: Date,
+            default: null,
+        },
         cancelledAt: {
             type: Date,
             default: null,

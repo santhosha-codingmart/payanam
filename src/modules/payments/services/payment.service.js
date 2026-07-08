@@ -269,46 +269,50 @@ export const verifyAndConfirmPayment = async (userId, payload) => {
         .populate("routeId",    "source destination")
         .populate("scheduleId", "departureDate departureTime arrivalTime");
 
-    // ── 7. Send booking confirmation email with PDF ticket (non-blocking) ───────
+    // ── 7. Send booking confirmation email with PDF ticket (truly non-blocking) ───────
     // A failed email MUST NOT roll back a confirmed payment.
-    try {
-        const u   = confirmedBooking.userId;
-        const sch = confirmedBooking.scheduleId;
-        const rt  = confirmedBooking.routeId;
-        const bus = confirmedBooking.busId;
-        const bp  = confirmedBooking.boardingPoint;
-        const dp  = confirmedBooking.droppingPoint;
+    // We don't await this - it runs in the background after response is sent.
+    setImmediate(async () => {
+        try {
+            const u   = confirmedBooking.userId;
+            const sch = confirmedBooking.scheduleId;
+            const rt  = confirmedBooking.routeId;
+            const bus = confirmedBooking.busId;
+            const bp  = confirmedBooking.boardingPoint;
+            const dp  = confirmedBooking.droppingPoint;
 
-        const depDate = sch?.departureDate
-            ? new Date(sch.departureDate).toLocaleDateString("en-IN", {
-                  day: "2-digit", month: "short", year: "numeric",
-                  timeZone: "Asia/Kolkata",
-              })
-            : "—";
+            const depDate = sch?.departureDate
+                ? new Date(sch.departureDate).toLocaleDateString("en-IN", {
+                      day: "2-digit", month: "short", year: "numeric",
+                      timeZone: "Asia/Kolkata",
+                  })
+                : "—";
 
-        // Generate the PDF ticket buffer
-        const pdfBuffer = await generateTicketPDF(confirmedBooking);
+            // Generate the PDF ticket buffer
+            const pdfBuffer = await generateTicketPDF(confirmedBooking);
 
-        await sendBookingConfirmationEmail(u.email, {
-            bookingId:     confirmedBooking.bookingId,
-            userName:      u.name,
-            busName:       bus?.busName    || "—",
-            busNumber:     bus?.busNumber  || "—",
-            source:        rt?.source?.city      || "—",
-            destination:   rt?.destination?.city || "—",
-            departureDate: depDate,
-            departureTime: sch?.departureTime || "—",
-            arrivalTime:   sch?.arrivalTime   || "—",
-            boardingPoint: bp ? `${bp.name}, ${bp.time}` : "—",
-            droppingPoint: dp ? `${dp.name}, ${dp.time}` : "—",
-            passengers:    confirmedBooking.passengerDetails,
-            totalFare:     confirmedBooking.totalFare,
-            paymentId:     razorpayPaymentId,
-            pdfBuffer,   // ← attached to email as PDF
-        });
-    } catch (emailErr) {
-        logger.warn("Booking confirmation email error (non-fatal)", { error: emailErr.message });
-    }
+            await sendBookingConfirmationEmail(u.email, {
+                bookingId:     confirmedBooking.bookingId,
+                userName:      u.name,
+                busName:       bus?.busName    || "—",
+                busNumber:     bus?.busNumber  || "—",
+                source:        rt?.source?.city      || "—",
+                destination:   rt?.destination?.city || "—",
+                departureDate: depDate,
+                departureTime: sch?.departureTime || "—",
+                arrivalTime:   sch?.arrivalTime   || "—",
+                boardingPoint: bp ? `${bp.name}, ${bp.time}` : "—",
+                droppingPoint: dp ? `${dp.name}, ${dp.time}` : "—",
+                passengers:    confirmedBooking.passengerDetails,
+                totalFare:     confirmedBooking.totalFare,
+                paymentId:     razorpayPaymentId,
+                pdfBuffer,   // ← attached to email as PDF
+            });
+            logger.info("Booking confirmation email sent", { bookingId: confirmedBooking.bookingId });
+        } catch (emailErr) {
+            logger.warn("Booking confirmation email error (non-fatal)", { error: emailErr.message });
+        }
+    });
 
     return {
         booking: confirmedBooking,
