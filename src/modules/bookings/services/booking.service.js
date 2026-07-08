@@ -246,13 +246,17 @@ export const createBookingService = async (userId, payload) => {
     try {
         await session.withTransaction(async () => {
             // 5a. Create the Booking document (status: PENDING)
+            // For bus schedules: busId, routeId come from schedule
+            // For flight schedules: airline/flight info is stored differently, but operatorId is on the schedule itself
+            const isFlightSchedule = schedule.routeId?.source?.city && schedule.routeId?.destination?.city && !schedule.busId;
+            
             [booking] = await Booking.create(
                 [
                     {
                         userId,
                         scheduleId,
-                        busId: schedule.busId._id,
-                        operatorId: schedule.busId.operatorId,
+                        busId: schedule.busId?._id || null,
+                        operatorId: schedule.operatorId,
                         routeId: schedule.routeId,
                         boardingPoint: {
                             pointId: boardingPoint._id,
@@ -380,7 +384,7 @@ export const getMyBookingsService = async (userId) => {
         .populate("routeId", "source destination")
         .populate("scheduleId", "departureDate departureTime arrivalTime")
         .select(
-            "bookingId bookingStatus paymentStatus paymentReference totalFare bookedSeats bookedAt cancelledAt boardingPoint droppingPoint passengerDetails"
+            "bookingId bookingStatus paymentStatus paymentReference totalFare bookedSeats bookedAt cancelledAt boardingPoint droppingPoint passengerDetails scheduleId busId routeId"
         );
 
     return bookings;
@@ -438,13 +442,56 @@ export const getVendorBookingsService = async (operatorId, filters = {}) => {
             .populate("userId",     "name email phoneNo")        // passenger contact
             .populate("busId",      "busName busNumber busType")
             .populate("routeId",    "source destination")
-            .populate("scheduleId", "departureDate departureTime arrivalTime")
+            .populate("scheduleId")
             .select("-cancellationPolicy -__v"), // trim fields vendor doesn't need
         Booking.countDocuments(query),
     ]);
 
+    // ── Post-process bookings to populate schedule-specific details ─────────
+    // For each booking, we need to populate the schedule's service (bus or flight)
+    const processedBookings = await Promise.all(bookings.map(async (booking) => {
+        if (!booking.scheduleId) return booking;
+
+        const scheduleId = booking.scheduleId._id || booking.scheduleId;
+        
+        // Check if schedule has flightId (FlightSchedule) or busId (BusSchedule)
+        const scheduleObj = booking.scheduleId.toObject ? booking.scheduleId.toObject() : booking.scheduleId;
+        
+        if (scheduleObj?.flightId) {
+            // Flight schedule - populate flight and route details
+            const { FlightSchedule } = await import("../../flights/models/flightSchedule.model.js");
+            const schedule = await FlightSchedule.findById(scheduleId)
+                .populate("flightId", "airlineName registrationNumber aircraftModel aircraftType cabinClasses amenities operatorName")
+                .populate("routeId", "source destination stops")
+                .select("-seats");
+            
+            if (schedule) {
+                return {
+                    ...booking.toObject(),
+                    scheduleId: schedule.toObject()
+                };
+            }
+        } else if (scheduleObj?.busId) {
+            // Bus schedule - populate bus and route details
+            const { Schedule } = await import("../../bus/models/schedule.model.js");
+            const schedule = await Schedule.findById(scheduleId)
+                .populate("busId", "busName busNumber busType")
+                .populate("routeId", "source destination")
+                .select("-seats");
+            
+            if (schedule) {
+                return {
+                    ...booking.toObject(),
+                    scheduleId: schedule.toObject()
+                };
+            }
+        }
+        
+        return booking;
+    }));
+
     return {
-        bookings,
+        bookings: processedBookings,
         pagination: {
             totalCount,
             totalPages: Math.ceil(totalCount / limitNum),

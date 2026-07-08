@@ -24,6 +24,7 @@ import {
     addFlightReview,
     getVendorFlightSchedules,
     getFlightScheduleById,
+    createFlightBooking,
 } from "../controllers/flight.controller.js";
 import {
     createPriceLock,
@@ -46,6 +47,7 @@ import {
     createFlightReviewSchema,
     createPriceLockSchema,
     priceLockIdParamSchema,
+    createFlightBookingSchema,
 } from "../validators/flight.validator.js";
 
 const router = express.Router();
@@ -844,6 +846,62 @@ router.post(
     authenticate,
     validate(createFlightReviewSchema),
     addFlightReview
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FLIGHT BOOKING
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/v1/flights/bookings:
+ *   post:
+ *     summary: Create a new flight booking
+ *     description: >
+ *       Creates a flight booking after verifying the Redis seat lock.
+ *       The user must have blocked seats via /block-seats before calling this.
+ *     tags: [Flights - Booking]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [scheduleId, passengerDetails]
+ *             properties:
+ *               scheduleId:
+ *                 type: string
+ *                 description: MongoDB ObjectId of the flight schedule
+ *               passengerDetails:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [seatNumber, name, age, gender]
+ *                   properties:
+ *                     seatNumber:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     age:
+ *                       type: integer
+ *                     gender:
+ *                       type: string
+ *                       enum: [male, female, other]
+ *     responses:
+ *       201:
+ *         description: Flight booking confirmed.
+ *       400:
+ *         description: No active seat lock found.
+ *       404:
+ *         description: Flight schedule not found.
+ */
+router.post(
+    "/bookings",
+    authenticate,
+    validate(createFlightBookingSchema),
+    createFlightBooking
 );
 
 export default router;

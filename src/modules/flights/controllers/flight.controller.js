@@ -295,3 +295,25 @@ export const addFlightReview = async (req, res, next) => {
         next(error);
     }
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FLIGHT BOOKING
+// ─────────────────────────────────────────────────────────────────────────────
+
+// POST /api/v1/flights/bookings — Create a new flight booking
+export const createFlightBooking = async (req, res, next) => {
+    try {
+        const booking = await flightService.createFlightBookingService(
+            req.user._id,
+            req.body
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: `Flight booking confirmed! Your PNR is ${booking.bookingId}.`,
+            data: booking,
+        });
+    } catch (error) {
+        next(error);
+    }
+};

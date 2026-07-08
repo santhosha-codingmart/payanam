@@ -329,3 +329,25 @@ export const priceLockIdParamSchema = z.object({
         priceLockId: z.string().min(1, "Price lock ID is required"),
     }),
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FLIGHT BOOKING Schemas
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Validates POST /api/v1/flights/bookings (create a flight booking)
+export const createFlightBookingSchema = z.object({
+    body: z.object({
+        scheduleId: objectId,
+        tripType: z.enum(["One Way", "Round Trip", "Multi City"]).optional().default("One Way"),
+        passengerDetails: z
+            .array(
+                z.object({
+                    seatNumber: z.string().min(1, "Seat number is required"),
+                    name: z.string().min(2).max(100),
+                    age: z.number().int().min(1).max(120),
+                    gender: z.enum(["male", "female", "other"]),
+                })
+            )
+            .min(1, "At least one passenger is required"),
+    }),
+});

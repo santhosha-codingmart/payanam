@@ -721,3 +721,77 @@ export const addFlightReviewService = async (userId, flightId, bookingId, rating
 
     return review;
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FLIGHT BOOKING CREATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Creates a new flight booking after verifying the Redis seat lock.
+export const createFlightBookingService = async (userId, payload) => {
+    const { scheduleId, passengerDetails } = payload;
+
+    // 1. Verify the schedule exists
+    const schedule = await FlightSchedule.findById(scheduleId);
+    if (!schedule) {
+        throw new ApiError(404, "Flight schedule not found.");
+    }
+
+    // 2. Verify Redis seat lock exists for this user
+    const lockKey = `flight_lock:${scheduleId}:${userId}`;
+    const lockExists = await redis.exists(lockKey);
+    if (!lockExists) {
+        throw new ApiError(400, "No active seat lock found. Please select seats again.");
+    }
+
+    // 3. Verify all requested seats are in the lock
+    const lockedSeatsJson = await redis.get(lockKey);
+    const lockedSeats = lockedSeatsJson ? JSON.parse(lockedSeatsJson) : [];
+    
+    for (const passenger of passengerDetails) {
+        if (!lockedSeats.includes(passenger.seatNumber)) {
+            throw new ApiError(400, `Seat ${passenger.seatNumber} is not locked. Please select seats again.`);
+        }
+    }
+
+    // 4. Calculate total fare
+    const totalFare = passengerDetails.reduce((sum, p) => {
+        const seat = schedule.seats.find(s => s.seatNumber === p.seatNumber);
+        if (!seat) throw new ApiError(400, `Seat ${p.seatNumber} not found in schedule.`);
+        return sum + (seat.fare || schedule.baseFare);
+    }, 0);
+
+    // 5. Create the booking
+    const booking = await Booking.create({
+        bookingId: `FLY-${Date.now().toString(36).toUpperCase()}`,
+        userId,
+        scheduleId,
+        busId: schedule.flightId, // Using busId field for flightId (same schema)
+        operatorId: schedule.operatorId,
+        routeId: schedule.routeId,
+        boardingPoint: { name: "Airport", city: "Terminal", time: schedule.departureTime },
+        droppingPoint: { name: "Airport", city: "Terminal", time: schedule.arrivalTime },
+        passengerDetails,
+        bookedSeats: passengerDetails.map(p => p.seatNumber),
+        totalFare,
+        bookingStatus: "PENDING",
+        paymentStatus: "PENDING",
+        bookedAt: new Date(),
+    });
+
+    // 6. Update seat status to BOOKED
+    for (const passenger of passengerDetails) {
+        const seatIndex = schedule.seats.findIndex(s => s.seatNumber === passenger.seatNumber);
+        if (seatIndex !== -1) {
+            schedule.seats[seatIndex].status = "BOOKED";
+            schedule.seats[seatIndex].passengerName = passenger.name;
+            schedule.seats[seatIndex].passengerGender = passenger.gender === "male" ? "M" : passenger.gender === "female" ? "F" : "O";
+        }
+    }
+    schedule.availableSeats = Math.max(0, schedule.availableSeats - passengerDetails.length);
+    await schedule.save();
+
+    // 7. Release the Redis lock
+    await redis.del(lockKey);
+
+    return booking;
+};
