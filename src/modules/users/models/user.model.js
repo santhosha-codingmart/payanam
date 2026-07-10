@@ -1,95 +1,78 @@
 import mongoose from "mongoose";
 
-let userSchema = mongoose.Schema({
+let userSchema = mongoose.Schema(
+  {
     name: {
-        type: String,
-        trim: true,
-        sparse: true
+      type: String,
+      trim: true,
+      sparse: true,
     },
-
     age: {
-        type: Number,
-        trim: true,
-        sparse: true
+      type: Number,
+      trim: true,
+      sparse: true,
     },
-
     email: {
-        type: String,
-        sparse: true,
-        trim: true,
-        unique: true
+      type: String,
+      sparse: true,
+      trim: true,
+      unique: true,
     },
-
     phoneNo: {
-        type: String,
-        sparse: true,
-        trim: true,
-        unique: true
+      type: String,
+      sparse: true,
+      trim: true,
+      unique: true,
     },
-
     isEmailVerified: {
-        type: Boolean,
-        default: false
+      type: Boolean,
+      default: false,
     },
-
     isPhoneVerified: {
-        type: Boolean,
-        default: false
+      type: Boolean,
+      default: false,
     },
-
     password: {
-        type: String
+      type: String,
     },
-
     role: {
-        type: String,
-        enum: ["user", "vendor", "admin"],
-        default: "user"
+      type: String,
+      enum: ["user", "vendor", "admin"],
+      default: "user",
     },
-
-    // ── Vendor-only fields ───────────────────────────────────────────────────
-    // Only populated when role === "vendor". Optional so regular users are
-    // not affected. companyName is the trading name shown to passengers;
-    // gstNumber is needed for tax invoicing.
     companyName: {
-        type: String,
-        trim: true,
-        sparse: true
+      type: String,
+      trim: true,
+      sparse: true,
     },
-
     gstNumber: {
-        type: String,
-        trim: true,
-        uppercase: true,
-        sparse: true,
-        // Standard Indian GST format: 2-digit state code + PAN + entity type + Z + check
-        match: [/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, "Invalid GST number format"]
+      type: String,
+      trim: true,
+      uppercase: true,
+      sparse: true,
+      match: [
+        /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
+        "Invalid GST number format",
+      ],
     },
-
-    // ── Profile Image ─────────────────────────────────────────────────────────
     profileImage: {
-        type: String,
-        default: null
+      type: String,
+      default: null,
     },
-
-    // ── Vendor Approval ────────────────────────────────────────────────────────
-    // Only relevant when role === "vendor".
-    // Admins approve or reject vendor registrations before they can list buses/flights.
     vendorApprovalStatus: {
-        type: String,
-        enum: ["PENDING", "APPROVED", "REJECTED"],
-        default: "PENDING",
+      type: String,
+      enum: ["PENDING", "APPROVED", "REJECTED"],
+      default: "PENDING",
     },
-
-    // ── Account Status ────────────────────────────────────────────────────────
-    // Admin can ban/unban any user account.
     isActive: {
-        type: Boolean,
-        default: true,
+      type: Boolean,
+      default: true,
     },
-}, {
-    timestamps: true
-});
+  },
+  {
+    timestamps: true,
+  },
+);
+const User = mongoose.model("User", userSchema);
 
-const User = mongoose.model('User', userSchema);
 export default User;

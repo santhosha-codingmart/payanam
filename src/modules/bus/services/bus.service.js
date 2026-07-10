@@ -1,10 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Bus Service — The Business Brain
-// This is where all the actual work happens. Controllers just pass data here.
-// Services interact with MongoDB (via Mongoose models), enforce business rules
-// (like "only the owner can edit this"), and throw ApiErrors if things go wrong.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { Bus } from "../models/bus.model.js";
 import { Route } from "../models/route.model.js";
 import { Schedule } from "../models/schedule.model.js";
@@ -14,860 +7,793 @@ import { Review } from "../models/review.model.js";
 import Booking from "../../bookings/models/booking.model.js";
 import { bulkUpsertCities } from "../../places/services/city.service.js";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BUS CRUD (Vendor-only)
-// ─────────────────────────────────────────────────────────────────────────────
-
 export const createBusService = async (operatorId, payload) => {
-    // 1. Enforce uniqueness: Bus registration numbers must be globally unique
-    const existing = await Bus.findOne({
-        registrationNumber: payload.registrationNumber.toUpperCase(),
-    });
-    if (existing) {
-        throw new ApiError(409, "A bus with this registration number already exists.");
-    }
-
-    // 2. Enforce uniqueness: Bus numbers must also be unique
-    const existingBusNum = await Bus.findOne({
-        busNumber: payload.busNumber.toUpperCase(),
-    });
-    if (existingBusNum) {
-        throw new ApiError(409, "A bus with this bus number already exists.");
-    }
-
-    // 3. Create the bus. Notice we inject `operatorId` here from the token,
-    // ensuring the vendor who made the request is set as the owner.
-    const bus = await Bus.create({
-        ...payload,
-        operatorId,
-        registrationNumber: payload.registrationNumber.toUpperCase(),
-        busNumber: payload.busNumber.toUpperCase(),
-    });
-
-    return bus;
-};
-
-// Gets all buses owned by the logged-in vendor, with optional filtering
-export const getVendorBusesService = async (operatorId, filters = {}) => {
-    const { search, busType, from, to } = filters;
-    const query = { operatorId };
-
-    // 1. Text Search: filter by registration number, bus number, or bus name
-    if (search) {
-        // Case-insensitive regex to match partial strings
-        const searchRegex = new RegExp(search, "i");
-        query.$or = [
-            { registrationNumber: searchRegex },
-            { busNumber: searchRegex },
-            { busName: searchRegex },
-        ];
-    }
-
-    // 2. Bus Type Filter: filter by AC_SEATER, AC_SLEEPER, etc.
-    if (busType) {
-        query.busType = busType;
-    }
-
-    // 3. Location Filter: filter by starting (from) and/or destination (to) location
-    // Since locations are stored in the Route model, we first query routes
-    // to find matching bus IDs, then add those IDs to our Bus query.
-    if (from || to) {
-        const routeQuery = { status: "ACTIVE" };
-
-        if (from && to) {
-            const fromRegex = new RegExp(`^${from}$`, "i");
-            const toRegex = new RegExp(`^${to}$`, "i");
-            routeQuery.$and = [
-                {
-                    $or: [
-                        { "source.city": fromRegex },
-                        { "stops.city": fromRegex },
-                    ],
-                },
-                {
-                    $or: [
-                        { "destination.city": toRegex },
-                        { "stops.city": toRegex },
-                    ],
-                },
-            ];
-        } else if (from) {
-            const fromRegex = new RegExp(`^${from}$`, "i");
-            routeQuery.$or = [
-                { "source.city": fromRegex },
-                { "stops.city": fromRegex },
-            ];
-        } else if (to) {
-            const toRegex = new RegExp(`^${to}$`, "i");
-            routeQuery.$or = [
-                { "destination.city": toRegex },
-                { "stops.city": toRegex },
-            ];
-        }
-
-        const matchingRoutes = await Route.find(routeQuery).select("busId stops");
-        const validBusIds = new Set();
-
-        // If both locations are provided, enforce direction (from comes before to)
-        if (from && to) {
-            const fromRegex = new RegExp(`^${from}$`, "i");
-            const toRegex = new RegExp(`^${to}$`, "i");
-            for (const route of matchingRoutes) {
-                const fromStop = route.stops.find(s => fromRegex.test(s.city));
-                const toStop = route.stops.find(s => toRegex.test(s.city));
-                if (fromStop && toStop && fromStop.order < toStop.order) {
-                    validBusIds.add(route.busId.toString());
-                }
-            }
-        } else {
-            for (const route of matchingRoutes) {
-                validBusIds.add(route.busId.toString());
-            }
-        }
-
-        // Add the matching bus IDs to the main bus query
-        query._id = { $in: Array.from(validBusIds) };
-    }
-
-    // We sort by createdAt: -1 to show the newest buses first
-    return await Bus.find(query).sort({ createdAt: -1 });
-};
-
-// Gets a specific bus by its ID. Used by vendors to view their own bus details,
-// or by admins.
-export const getBusByIdService = async (busId) => {
-    const bus = await Bus.findById(busId);
-    if (!bus) {
-        throw new ApiError(404, "Bus not found.");
-    }
-    return bus;
-};
-
-// Updates a bus's details (partial update)
-export const updateBusService = async (busId, operatorId, updateData) => {
-    const bus = await Bus.findById(busId);
-    if (!bus) {
-        throw new ApiError(404, "Bus not found.");
-    }
-
-    // ── OWNERSHIP CHECK ──
-    // This is crucial. Even if you have the ID of another vendor's bus,
-    // you cannot edit it unless your operatorId matches the bus's operatorId.
-    // We use .toString() because MongoDB ObjectIds are objects, not strings.
-    if (bus.operatorId.toString() !== operatorId.toString()) {
-        throw new ApiError(403, "You can only update your own buses.");
-    }
-
-    // If registration number is being changed, we must verify the new one
-    // isn't already taken by SOME OTHER bus (_id: { $ne: busId }).
-    if (updateData.registrationNumber) {
-        updateData.registrationNumber = updateData.registrationNumber.toUpperCase();
-        const duplicate = await Bus.findOne({
-            registrationNumber: updateData.registrationNumber,
-            _id: { $ne: busId }, // $ne = not equal
-        });
-        if (duplicate) {
-            throw new ApiError(409, "Another bus with this registration number already exists.");
-        }
-    }
-
-    // Same duplicate check for busNumber
-    if (updateData.busNumber) {
-        updateData.busNumber = updateData.busNumber.toUpperCase();
-        const duplicate = await Bus.findOne({
-            busNumber: updateData.busNumber,
-            _id: { $ne: busId },
-        });
-        if (duplicate) {
-            throw new ApiError(409, "Another bus with this bus number already exists.");
-        }
-    }
-
-    // Object.assign merges the new fields into the existing Mongoose document
-    Object.assign(bus, updateData);
-    await bus.save(); // Save triggers Mongoose validation before writing to DB
-    return bus;
-};
-
-// Retires a bus instead of hard-deleting it.
-// Blocks deletion if there are active future schedules.
-export const deleteBusService = async (busId, operatorId) => {
-    const bus = await Bus.findById(busId);
-    if (!bus) {
-        throw new ApiError(404, "Bus not found.");
-    }
-
-    // ── OWNERSHIP CHECK ──
-    if (bus.operatorId.toString() !== operatorId.toString()) {
-        throw new ApiError(403, "You can only delete your own buses.");
-    }
-
-    // ── ACTIVE SCHEDULES CHECK ──
-    // Check if this bus has any future schedules that are not cancelled or completed.
-    const now = new Date();
-    const activeSchedules = await Schedule.countDocuments({
-        busId,
-        departureDate: { $gte: now },
-        status: "SCHEDULED"
-    });
-
-    if (activeSchedules > 0) {
-        throw new ApiError(
-            400, 
-            `Cannot retire this bus. It is currently assigned to ${activeSchedules} active future schedule(s). Please cancel or reassign them first.`
-        );
-    }
-
-    // ── SOFT DELETE (RETIRE) ──
-    // Instead of wiping out historical routes, schedules, and orphaned bookings,
-    // we just mark the bus as RETIRED so it won't be available for new routes.
-    bus.status = "RETIRED";
-    await bus.save();
-
-    return true;
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ROUTE MANAGEMENT (Vendor-only)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const createRouteService = async (operatorId, routeData) => {
-    // 1. Verify the bus exists
-    const bus = await Bus.findById(routeData.busId);
-    if (!bus) {
-        throw new ApiError(404, "Bus not found.");
-    }
-
-    // 2. Verify the vendor actually owns this bus
-    if (bus.operatorId.toString() !== operatorId.toString()) {
-        throw new ApiError(403, "You can only create routes for your own buses.");
-    }
-
-    // 3. Ensure stops are sorted by their `order` property ascending.
-    // This protects against a frontend bug sending them out of order.
-    routeData.stops.sort((a, b) => a.order - b.order);
-
-    const route = await Route.create(routeData);
-
-    // 4. ── AUTO-REGISTER CITIES ──
-    // Every city mentioned in this route (source, destination, all stops) is
-    // automatically upserted into the City collection.
-    //
-    // WHY HERE?
-    //   The route is the authoritative source of city data in this platform.
-    //   When a vendor registers "Vellore → Bangalore", both cities should
-    //   immediately become searchable in the place search API — without any
-    //   manual admin action.
-    //
-    // HOW DUPLICATES ARE PREVENTED:
-    //   bulkUpsertCities uses MongoDB's compound unique index { name, state }
-    //   with upsert: true. If the city already exists, it's left unchanged
-    //   (except popularity is incremented). If it's new, it's inserted.
-    //   This is safe to call concurrently — MongoDB's atomic upsert handles races.
-    const citiesToUpsert = [
-        { name: routeData.source.city, state: routeData.source.state },
-        { name: routeData.destination.city, state: routeData.destination.state },
-        ...routeData.stops.map((stop) => ({ name: stop.city, state: stop.state || routeData.source.state })),
-    ];
-
-    // Fire-and-forget: city registration is important but should not block
-    // the vendor's route creation response. If it fails (e.g., transient DB
-    // error), the route is still created — cities can be re-synced later.
-    bulkUpsertCities(citiesToUpsert).catch((err) =>
-        console.error("[CityService] Failed to auto-register cities for route:", err.message)
+  const existing = await Bus.findOne({
+    registrationNumber: payload.registrationNumber.toUpperCase(),
+  });
+  if (existing) {
+    throw new ApiError(
+      409,
+      "A bus with this registration number already exists.",
     );
-
-    return route;
+  }
+  const existingBusNum = await Bus.findOne({
+    busNumber: payload.busNumber.toUpperCase(),
+  });
+  if (existingBusNum) {
+    throw new ApiError(409, "A bus with this bus number already exists.");
+  }
+  const bus = await Bus.create({
+    ...payload,
+    operatorId,
+    registrationNumber: payload.registrationNumber.toUpperCase(),
+    busNumber: payload.busNumber.toUpperCase(),
+  });
+  return bus;
 };
 
-// Fetch all routes defined for a specific bus
-export const getRoutesForBusService = async (busId) => {
-    return await Route.find({ busId }).sort({ createdAt: -1 });
+export const getVendorBusesService = async (operatorId, filters = {}) => {
+  const { search, busType, from, to } = filters;
+  const query = {
+    operatorId,
+  };
+  if (search) {
+    const searchRegex = new RegExp(search, "i");
+    query.$or = [
+      {
+        registrationNumber: searchRegex,
+      },
+      {
+        busNumber: searchRegex,
+      },
+      {
+        busName: searchRegex,
+      },
+    ];
+  }
+  if (busType) {
+    query.busType = busType;
+  }
+  if (from || to) {
+    const routeQuery = {
+      status: "ACTIVE",
+    };
+    if (from && to) {
+      const fromRegex = new RegExp(`^${from}$`, "i");
+      const toRegex = new RegExp(`^${to}$`, "i");
+      routeQuery.$and = [
+        {
+          $or: [
+            {
+              "source.city": fromRegex,
+            },
+            {
+              "stops.city": fromRegex,
+            },
+          ],
+        },
+        {
+          $or: [
+            {
+              "destination.city": toRegex,
+            },
+            {
+              "stops.city": toRegex,
+            },
+          ],
+        },
+      ];
+    } else if (from) {
+      const fromRegex = new RegExp(`^${from}$`, "i");
+      routeQuery.$or = [
+        {
+          "source.city": fromRegex,
+        },
+        {
+          "stops.city": fromRegex,
+        },
+      ];
+    } else if (to) {
+      const toRegex = new RegExp(`^${to}$`, "i");
+      routeQuery.$or = [
+        {
+          "destination.city": toRegex,
+        },
+        {
+          "stops.city": toRegex,
+        },
+      ];
+    }
+    const matchingRoutes = await Route.find(routeQuery).select("busId stops");
+    const validBusIds = new Set();
+    if (from && to) {
+      const fromRegex = new RegExp(`^${from}$`, "i");
+      const toRegex = new RegExp(`^${to}$`, "i");
+      for (const route of matchingRoutes) {
+        const fromStop = route.stops.find((s) => fromRegex.test(s.city));
+        const toStop = route.stops.find((s) => toRegex.test(s.city));
+        if (fromStop && toStop && fromStop.order < toStop.order) {
+          validBusIds.add(route.busId.toString());
+        }
+      }
+    } else {
+      for (const route of matchingRoutes) {
+        validBusIds.add(route.busId.toString());
+      }
+    }
+    query._id = {
+      $in: Array.from(validBusIds),
+    };
+  }
+  return await Bus.find(query).sort({
+    createdAt: -1,
+  });
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SCHEDULE MANAGEMENT (Vendor-only)
-// ─────────────────────────────────────────────────────────────────────────────
+export const getBusByIdService = async (busId) => {
+  const bus = await Bus.findById(busId);
+  if (!bus) {
+    throw new ApiError(404, "Bus not found.");
+  }
+  return bus;
+};
 
-export const createScheduleService = async (operatorId, scheduleData) => {
-    const { routeId, busId, departureDate, arrivalDate, departureTime, arrivalTime, baseFare } = scheduleData;
-
-    // 1. Verify bus exists and belongs to vendor
-    const bus = await Bus.findById(busId);
-    if (!bus) {
-        throw new ApiError(404, "Bus not found.");
-    }
-    if (bus.operatorId.toString() !== operatorId.toString()) {
-        throw new ApiError(403, "You can only create schedules for your own buses.");
-    }
-
-    // 2. Verify route exists and actually belongs to this bus
-    const route = await Route.findById(routeId);
-    if (!route) {
-        throw new ApiError(404, "Route not found.");
-    }
-    if (route.busId.toString() !== busId) {
-        throw new ApiError(400, "This route does not belong to the specified bus.");
-    }
-
-    // 3. Validate and parse dates
-    const departureDateObj = new Date(departureDate);
-    if (isNaN(departureDateObj.getTime())) {
-        throw new ApiError(400, "Invalid departure date format");
-    }
-
-    // If arrivalDate is not provided, default to departureDate (same-day trips)
-    const arrivalDateObj = arrivalDate ? new Date(arrivalDate) : departureDateObj;
-    if (isNaN(arrivalDateObj.getTime())) {
-        throw new ApiError(400, "Invalid arrival date format");
-    }
-
-    // 4. Duplicate check: Prevent creating two trips for the exact same bus
-    // at the exact same time on the exact same date.
-    const duplicate = await Schedule.findOne({
-        busId,
-        departureDate: departureDateObj,
-        departureTime,
+export const updateBusService = async (busId, operatorId, updateData) => {
+  const bus = await Bus.findById(busId);
+  if (!bus) {
+    throw new ApiError(404, "Bus not found.");
+  }
+  if (bus.operatorId.toString() !== operatorId.toString()) {
+    throw new ApiError(403, "You can only update your own buses.");
+  }
+  if (updateData.registrationNumber) {
+    updateData.registrationNumber = updateData.registrationNumber.toUpperCase();
+    const duplicate = await Bus.findOne({
+      registrationNumber: updateData.registrationNumber,
+      _id: {
+        $ne: busId,
+      },
     });
     if (duplicate) {
-        throw new ApiError(409, "A schedule already exists for this bus on this date and time.");
+      throw new ApiError(
+        409,
+        "Another bus with this registration number already exists.",
+      );
     }
-
-    // 4. ── THE SEAT SNAPSHOT ──
-    // Here we take the bus's `seatLayout` template and create a new array
-    // of seats for this specific trip. We add the `status: "AVAILABLE"` field.
-    const seats = bus.seatLayout.map((seat) => ({
-        seatNumber: seat.seatNumber,
-        seatType: seat.seatType,
-        deck: seat.deck,
-        row: seat.row,
-        column: seat.column,
-        isSleeper: seat.isSleeper,
-        fare: seat.fare || baseFare,
-        status: "AVAILABLE", // Default status
-        bookedBy: null,
-        passengerName: null,
-        passengerAge: null,
-        passengerGender: null,
-    }));
-
-    const schedule = await Schedule.create({
-        routeId,
-        busId,
-        operatorId,
-        departureDate: departureDateObj,
-        arrivalDate: arrivalDateObj,
-        departureTime,
-        arrivalTime,
-        baseFare,
-        availableSeats: seats.length, // Start with all seats available
-        seats,
-        boardingPoints: scheduleData.boardingPoints || [],
-        droppingPoints: scheduleData.droppingPoints || [],
-        // Apply default refund policy if the vendor didn't provide one
-        cancellationPolicy: scheduleData.cancellationPolicy || [
-            { hoursBeforeDeparture: 24, refundPercentage: 75 },
-            { hoursBeforeDeparture: 12, refundPercentage: 50 },
-            { hoursBeforeDeparture: 6, refundPercentage: 25 },
-            { hoursBeforeDeparture: 0, refundPercentage: 0 },
-        ],
+  }
+  if (updateData.busNumber) {
+    updateData.busNumber = updateData.busNumber.toUpperCase();
+    const duplicate = await Bus.findOne({
+      busNumber: updateData.busNumber,
+      _id: {
+        $ne: busId,
+      },
     });
-
-    return schedule;
+    if (duplicate) {
+      throw new ApiError(
+        409,
+        "Another bus with this bus number already exists.",
+      );
+    }
+  }
+  Object.assign(bus, updateData);
+  await bus.save();
+  return bus;
 };
 
-// Gets the full seat map for a specific trip, used by the frontend to render the bus layout
+export const deleteBusService = async (busId, operatorId) => {
+  const bus = await Bus.findById(busId);
+  if (!bus) {
+    throw new ApiError(404, "Bus not found.");
+  }
+  if (bus.operatorId.toString() !== operatorId.toString()) {
+    throw new ApiError(403, "You can only delete your own buses.");
+  }
+  const now = new Date();
+  const activeSchedules = await Schedule.countDocuments({
+    busId,
+    departureDate: {
+      $gte: now,
+    },
+    status: "SCHEDULED",
+  });
+  if (activeSchedules > 0) {
+    throw new ApiError(
+      400,
+      `Cannot retire this bus. It is currently assigned to ${activeSchedules} active future schedule(s). Please cancel or reassign them first.`,
+    );
+  }
+  bus.status = "RETIRED";
+  await bus.save();
+  return true;
+};
+
+export const createRouteService = async (operatorId, routeData) => {
+  const bus = await Bus.findById(routeData.busId);
+  if (!bus) {
+    throw new ApiError(404, "Bus not found.");
+  }
+  if (bus.operatorId.toString() !== operatorId.toString()) {
+    throw new ApiError(403, "You can only create routes for your own buses.");
+  }
+  routeData.stops.sort((a, b) => a.order - b.order);
+  const route = await Route.create(routeData);
+  const citiesToUpsert = [
+    {
+      name: routeData.source.city,
+      state: routeData.source.state,
+    },
+    {
+      name: routeData.destination.city,
+      state: routeData.destination.state,
+    },
+    ...routeData.stops.map((stop) => ({
+      name: stop.city,
+      state: stop.state || routeData.source.state,
+    })),
+  ];
+  bulkUpsertCities(citiesToUpsert).catch((err) =>
+    console.error(
+      "[CityService] Failed to auto-register cities for route:",
+      err.message,
+    ),
+  );
+  return route;
+};
+
+export const getRoutesForBusService = async (busId) => {
+  return await Route.find({
+    busId,
+  }).sort({
+    createdAt: -1,
+  });
+};
+
+export const createScheduleService = async (operatorId, scheduleData) => {
+  const {
+    routeId,
+    busId,
+    departureDate,
+    arrivalDate,
+    departureTime,
+    arrivalTime,
+    baseFare,
+  } = scheduleData;
+  const bus = await Bus.findById(busId);
+  if (!bus) {
+    throw new ApiError(404, "Bus not found.");
+  }
+  if (bus.operatorId.toString() !== operatorId.toString()) {
+    throw new ApiError(
+      403,
+      "You can only create schedules for your own buses.",
+    );
+  }
+  const route = await Route.findById(routeId);
+  if (!route) {
+    throw new ApiError(404, "Route not found.");
+  }
+  if (route.busId.toString() !== busId) {
+    throw new ApiError(400, "This route does not belong to the specified bus.");
+  }
+  const departureDateObj = new Date(departureDate);
+  if (isNaN(departureDateObj.getTime())) {
+    throw new ApiError(400, "Invalid departure date format");
+  }
+  const arrivalDateObj = arrivalDate ? new Date(arrivalDate) : departureDateObj;
+  if (isNaN(arrivalDateObj.getTime())) {
+    throw new ApiError(400, "Invalid arrival date format");
+  }
+  const duplicate = await Schedule.findOne({
+    busId,
+    departureDate: departureDateObj,
+    departureTime,
+  });
+  if (duplicate) {
+    throw new ApiError(
+      409,
+      "A schedule already exists for this bus on this date and time.",
+    );
+  }
+  const seats = bus.seatLayout.map((seat) => ({
+    seatNumber: seat.seatNumber,
+    seatType: seat.seatType,
+    deck: seat.deck,
+    row: seat.row,
+    column: seat.column,
+    isSleeper: seat.isSleeper,
+    fare: seat.fare || baseFare,
+    status: "AVAILABLE",
+    bookedBy: null,
+    passengerName: null,
+    passengerAge: null,
+    passengerGender: null,
+  }));
+  const schedule = await Schedule.create({
+    routeId,
+    busId,
+    operatorId,
+    departureDate: departureDateObj,
+    arrivalDate: arrivalDateObj,
+    departureTime,
+    arrivalTime,
+    baseFare,
+    availableSeats: seats.length,
+    seats,
+    boardingPoints: scheduleData.boardingPoints || [],
+    droppingPoints: scheduleData.droppingPoints || [],
+    cancellationPolicy: scheduleData.cancellationPolicy || [
+      {
+        hoursBeforeDeparture: 24,
+        refundPercentage: 75,
+      },
+      {
+        hoursBeforeDeparture: 12,
+        refundPercentage: 50,
+      },
+      {
+        hoursBeforeDeparture: 6,
+        refundPercentage: 25,
+      },
+      {
+        hoursBeforeDeparture: 0,
+        refundPercentage: 0,
+      },
+    ],
+  });
+  return schedule;
+};
+
 export const getScheduleSeatsService = async (scheduleId) => {
-    // ── .populate() ──
-    // Schedule only stores `busId` and `routeId`.
-    // .populate() tells Mongoose to automatically fetch the related Bus and Route
-    // documents and replace the ID with the actual object.
-    // The `select` option tells it to only fetch the fields we actually need.
-    const schedule = await Schedule.findById(scheduleId)
-        .populate({ path: "busId", select: "busName busType busNumber amenities seatLayoutType photos averageRating" })
-        .populate({ path: "routeId", select: "source destination stops distanceInKm estimatedDurationInMinutes" });
-
-    if (!schedule) {
-        throw new ApiError(404, "Schedule not found.");
-    }
-
-    // We return a flattened object that's easy for the frontend to consume
-    return {
-        scheduleId: schedule._id,
-        bus: schedule.busId,         // Populated bus object
-        route: schedule.routeId,     // Populated route object
-        departureDate: schedule.departureDate,
-        arrivalDate: schedule.arrivalDate,
-        departureTime: schedule.departureTime,
-        arrivalTime: schedule.arrivalTime,
-        baseFare: schedule.baseFare,
-        availableSeats: schedule.availableSeats,
-        totalSeats: schedule.seats.length,
-        seats: schedule.seats,       // The actual array of seat statuses
-        boardingPoints: schedule.boardingPoints,
-        droppingPoints: schedule.droppingPoints,
-        cancellationPolicy: schedule.cancellationPolicy,
-        status: schedule.status,
-    };
+  const schedule = await Schedule.findById(scheduleId)
+    .populate({
+      path: "busId",
+      select:
+        "busName busType busNumber amenities seatLayoutType photos averageRating",
+    })
+    .populate({
+      path: "routeId",
+      select:
+        "source destination stops distanceInKm estimatedDurationInMinutes",
+    });
+  if (!schedule) {
+    throw new ApiError(404, "Schedule not found.");
+  }
+  return {
+    scheduleId: schedule._id,
+    bus: schedule.busId,
+    route: schedule.routeId,
+    departureDate: schedule.departureDate,
+    arrivalDate: schedule.arrivalDate,
+    departureTime: schedule.departureTime,
+    arrivalTime: schedule.arrivalTime,
+    baseFare: schedule.baseFare,
+    availableSeats: schedule.availableSeats,
+    totalSeats: schedule.seats.length,
+    seats: schedule.seats,
+    boardingPoints: schedule.boardingPoints,
+    droppingPoints: schedule.droppingPoints,
+    cancellationPolicy: schedule.cancellationPolicy,
+    status: schedule.status,
+  };
 };
 
 export const getVendorSchedulesService = async (operatorId) => {
-    // Return all schedules belonging to the vendor, sorted by departure date.
-    // Populate the busId and routeId to provide meaningful data.
-    const schedules = await Schedule.find({ operatorId })
-        .populate({ path: "busId", select: "busName busNumber busType" })
-        .populate({ path: "routeId", select: "source destination" })
-        .select("-seats") // Exclude the huge seats array for performance
-        .sort({ departureDate: 1, departureTime: 1 });
-
-    return schedules;
+  const schedules = await Schedule.find({
+    operatorId,
+  })
+    .populate({
+      path: "busId",
+      select: "busName busNumber busType",
+    })
+    .populate({
+      path: "routeId",
+      select: "source destination",
+    })
+    .select("-seats")
+    .sort({
+      departureDate: 1,
+      departureTime: 1,
+    });
+  return schedules;
 };
 
 export const getScheduleByIdService = async (scheduleId) => {
-    const schedule = await Schedule.findById(scheduleId)
-        .populate({ path: "busId", select: "busName busNumber busType totalSeats amenities isAC isSleeper isSeater photos averageRating operatorName" })
-        .populate({ path: "routeId", select: "source destination distanceInKm estimatedDurationInMinutes boardingPoints droppingPoints farePerKm" })
-        .select("-seats");
-        
-    if (!schedule) throw new ApiError(404, "Schedule not found");
-    
-    return {
-        scheduleId: schedule._id,
-        bus: schedule.busId,
-        route: schedule.routeId,
-        departureDate: schedule.departureDate,
-        arrivalDate: schedule.arrivalDate,
-        departureTime: schedule.departureTime,
-        arrivalTime: schedule.arrivalTime,
-        baseFare: schedule.baseFare,
-        availableSeats: schedule.availableSeats,
-        totalSeats: schedule.seats ? schedule.seats.length : (schedule.busId?.totalSeats || schedule.availableSeats),
-        boardingPoints: schedule.boardingPoints,
-        droppingPoints: schedule.droppingPoints,
-        cancellationPolicy: schedule.cancellationPolicy,
-        status: schedule.status,
-    };
+  const schedule = await Schedule.findById(scheduleId)
+    .populate({
+      path: "busId",
+      select:
+        "busName busNumber busType totalSeats amenities isAC isSleeper isSeater photos averageRating operatorName",
+    })
+    .populate({
+      path: "routeId",
+      select:
+        "source destination distanceInKm estimatedDurationInMinutes boardingPoints droppingPoints farePerKm",
+    })
+    .select("-seats");
+  if (!schedule) throw new ApiError(404, "Schedule not found");
+  return {
+    scheduleId: schedule._id,
+    bus: schedule.busId,
+    route: schedule.routeId,
+    departureDate: schedule.departureDate,
+    arrivalDate: schedule.arrivalDate,
+    departureTime: schedule.departureTime,
+    arrivalTime: schedule.arrivalTime,
+    baseFare: schedule.baseFare,
+    availableSeats: schedule.availableSeats,
+    totalSeats: schedule.seats
+      ? schedule.seats.length
+      : schedule.busId?.totalSeats || schedule.availableSeats,
+    boardingPoints: schedule.boardingPoints,
+    droppingPoints: schedule.droppingPoints,
+    cancellationPolicy: schedule.cancellationPolicy,
+    status: schedule.status,
+  };
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SEARCH (Public — No auth required)
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const searchBusesService = async (from, to, date, filters = {}) => {
-    // Use regex to allow case-insensitive searching (e.g., "chennai" matches "Chennai")
-    // ^ means "start of string", $ means "end of string", "i" means case-insensitive
-    const fromRegex = new RegExp(`^${from}$`, "i");
-    const toRegex = new RegExp(`^${to}$`, "i");
-
-    // ── STEP 1: Find matching routes ──
-    // We look for routes where BOTH the "from" city AND "to" city exist somewhere
-    // in the route (either as the main source/destination, OR in the stops array).
-    const routes = await Route.find({
-        status: "ACTIVE",
-        $and: [
-            {
-                $or: [
-                    { "source.city": fromRegex },
-                    { "stops.city": fromRegex },
-                ],
-            },
-            {
-                $or: [
-                    { "destination.city": toRegex },
-                    { "stops.city": toRegex },
-                ],
-            },
+  const fromRegex = new RegExp(`^${from}$`, "i");
+  const toRegex = new RegExp(`^${to}$`, "i");
+  const routes = await Route.find({
+    status: "ACTIVE",
+    $and: [
+      {
+        $or: [
+          {
+            "source.city": fromRegex,
+          },
+          {
+            "stops.city": fromRegex,
+          },
         ],
+      },
+      {
+        $or: [
+          {
+            "destination.city": toRegex,
+          },
+          {
+            "stops.city": toRegex,
+          },
+        ],
+      },
+    ],
+  });
+  if (routes.length === 0) {
+    return [];
+  }
+  const validRoutes = [];
+  for (const route of routes) {
+    const fromStop = route.stops.find((s) => fromRegex.test(s.city));
+    const toStop = route.stops.find((s) => toRegex.test(s.city));
+    if (fromStop && toStop && fromStop.order < toStop.order) {
+      validRoutes.push({
+        routeId: route._id,
+        boardingStop: fromStop,
+        droppingStop: toStop,
+        farePerKm: route.farePerKm || 0,
+        totalDistanceInKm: route.distanceInKm,
+      });
+    }
+  }
+  if (validRoutes.length === 0) {
+    return [];
+  }
+  const routeIds = validRoutes.map((r) => r.routeId);
+  const searchDate = new Date(date);
+  const nextDay = new Date(date);
+  nextDay.setDate(nextDay.getDate() + 1);
+  const scheduleQuery = {
+    routeId: {
+      $in: routeIds,
+    },
+    departureDate: {
+      $gte: searchDate,
+      $lt: nextDay,
+    },
+    status: "SCHEDULED",
+    availableSeats: {
+      $gt: 0,
+    },
+  };
+  const busQuery = {};
+  if (filters.busType) {
+    busQuery.busType = filters.busType;
+  }
+  if (filters.isAC !== undefined) {
+    busQuery.isAC = filters.isAC === "true";
+  }
+  let query = Schedule.find(scheduleQuery)
+    .populate({
+      path: "busId",
+      select:
+        "busName busType busNumber amenities seatLayoutType isAC isSleeper isSeater averageRating totalRatings photos operatorName totalSeats",
+      match: Object.keys(busQuery).length > 0 ? busQuery : undefined,
+    })
+    .populate({
+      path: "routeId",
+      select:
+        "source destination stops distanceInKm estimatedDurationInMinutes farePerKm",
+    })
+    .select("-seats")
+    .sort({
+      departureTime: 1,
     });
-
-    if (routes.length === 0) {
-        return []; // No routes exist between these two cities
+  let schedules = await query;
+  schedules = schedules.filter((s) => s.busId !== null);
+  const routeMap = new Map(validRoutes.map((r) => [r.routeId.toString(), r]));
+  schedules = schedules.map((schedule) => {
+    const scheduleObj = schedule.toObject();
+    const routeInfo = routeMap.get(schedule.routeId._id.toString());
+    let calculatedFare = scheduleObj.baseFare;
+    if (routeInfo) {
+      const segmentDistance =
+        routeInfo.droppingStop.distanceFromSource -
+        routeInfo.boardingStop.distanceFromSource;
+      if (routeInfo.farePerKm > 0 && segmentDistance > 0) {
+        calculatedFare = Math.round(routeInfo.farePerKm * segmentDistance);
+      }
     }
-
-    // ── STEP 2: Verify direction ──
-    // Just because a route contains both cities doesn't mean it goes in the right direction!
-    // E.g., a Chennai→Bangalore route has both cities, but we shouldn't show it for
-    // a Bangalore→Chennai search.
-    const validRoutes = [];
-
-    for (const route of routes) {
-        // Find the specific objects in the `stops` array for the requested cities
-        const fromStop = route.stops.find((s) => fromRegex.test(s.city));
-        const toStop = route.stops.find((s) => toRegex.test(s.city));
-
-        // Ensure the "from" city comes BEFORE the "to" city in the route's order
-        if (fromStop && toStop && fromStop.order < toStop.order) {
-            validRoutes.push({
-                routeId: route._id,
-                boardingStop: fromStop,
-                droppingStop: toStop,
-                farePerKm: route.farePerKm || 0,
-                totalDistanceInKm: route.distanceInKm,
-            });
-        }
-    }
-
-    if (validRoutes.length === 0) {
-        return [];
-    }
-
-    // Get an array of just the valid route IDs
-    const routeIds = validRoutes.map((r) => r.routeId);
-
-    // ── STEP 3: Find schedules for these routes on the given date ──
-    const searchDate = new Date(date);
-    const nextDay = new Date(date);
-    nextDay.setDate(nextDay.getDate() + 1); // Used to query a 24-hour window
-
-    const scheduleQuery = {
-        routeId: { $in: routeIds },
-        // departureDate is >= searchDate AND < nextDay
-        departureDate: { $gte: searchDate, $lt: nextDay },
-        status: "SCHEDULED",
-        availableSeats: { $gt: 0 }, // Don't show fully booked buses
+    const filteredBoardingPoints = (scheduleObj.boardingPoints || [])
+      .filter((bp) => fromRegex.test(bp.city))
+      .map((bp) => ({
+        id: bp._id,
+        city: bp.city,
+        name: bp.name,
+        time: bp.time,
+        address: bp.address,
+        landmark: bp.landmark,
+      }));
+    const filteredDroppingPoints = (scheduleObj.droppingPoints || [])
+      .filter((dp) => toRegex.test(dp.city))
+      .map((dp) => ({
+        id: dp._id,
+        city: dp.city,
+        name: dp.name,
+        time: dp.time,
+        address: dp.address,
+        landmark: dp.landmark,
+      }));
+    const cancellationPolicy = (scheduleObj.cancellationPolicy || []).map(
+      (cp) => ({
+        hoursBeforeDeparture: cp.hoursBeforeDeparture,
+        refundPercentage: cp.refundPercentage,
+      }),
+    );
+    return {
+      scheduleId: scheduleObj._id,
+      operator: {
+        id: scheduleObj.operatorId,
+        name: scheduleObj.busId?.operatorName || "Unknown",
+      },
+      bus: {
+        id: scheduleObj.busId?._id,
+        name: scheduleObj.busId?.busName,
+        number: scheduleObj.busId?.busNumber,
+        type: scheduleObj.busId?.busType,
+        layout: scheduleObj.busId?.seatLayoutType,
+        isAC: scheduleObj.busId?.isAC,
+        isSleeper: scheduleObj.busId?.isSleeper,
+        isSeater: scheduleObj.busId?.isSeater,
+        amenities: scheduleObj.busId?.amenities || [],
+        rating: scheduleObj.busId?.averageRating || 0,
+      },
+      journey: {
+        departureDate: scheduleObj.departureDate,
+        arrivalDate: scheduleObj.arrivalDate,
+        departureTime: scheduleObj.departureTime,
+        arrivalTime: scheduleObj.arrivalTime,
+        durationMinutes: scheduleObj.routeId?.estimatedDurationInMinutes,
+        source: routeInfo
+          ? routeInfo.boardingStop.city
+          : scheduleObj.routeId?.source.city,
+        destination: routeInfo
+          ? routeInfo.droppingStop.city
+          : scheduleObj.routeId?.destination.city,
+      },
+      pricing: {
+        baseFare: scheduleObj.baseFare,
+        calculatedFare: calculatedFare,
+      },
+      seats: {
+        available: scheduleObj.availableSeats,
+        total: scheduleObj.busId?.totalSeats || scheduleObj.availableSeats,
+      },
+      boardingPoints: filteredBoardingPoints,
+      droppingPoints: filteredDroppingPoints,
+      cancellationPolicy: cancellationPolicy,
+      status: scheduleObj.status,
     };
-
-    // ── STEP 4: Apply frontend filters (Bus Level) ──
-    const busQuery = {};
-    if (filters.busType) {
-        busQuery.busType = filters.busType;
-    }
-    if (filters.isAC !== undefined) {
-        busQuery.isAC = filters.isAC === "true"; // Convert string to boolean
-    }
-
-    // ── STEP 5: Execute the query with populations ──
-    let query = Schedule.find(scheduleQuery)
-        .populate({
-            path: "busId",
-            select: "busName busType busNumber amenities seatLayoutType isAC isSleeper isSeater averageRating totalRatings photos operatorName totalSeats",
-            // The `match` option here acts like an INNER JOIN condition.
-            // If the bus doesn't match the busQuery (e.g., user wants AC but bus is Non-AC),
-            // Mongoose will set `busId` to null for this schedule.
-            match: Object.keys(busQuery).length > 0 ? busQuery : undefined,
-        })
-        .populate({
-            path: "routeId",
-            select: "source destination stops distanceInKm estimatedDurationInMinutes farePerKm",
-        })
-        // Exclude the massive `seats` array to keep the payload small.
-        // Users will fetch the seat map later when they click on a specific bus.
-        .select("-seats")
-        .sort({ departureTime: 1 }); // Sort by time ascending (morning to night)
-
-    let schedules = await query;
-
-    // Remove schedules where the bus was filtered out (busId is null)
-    schedules = schedules.filter((s) => s.busId !== null);
-
-    // ── STEP 6: Enrich results and format to Frontend-Friendly Contract ──
-    const routeMap = new Map(validRoutes.map((r) => [r.routeId.toString(), r]));
-
-    schedules = schedules.map((schedule) => {
-        const scheduleObj = schedule.toObject();
-        const routeInfo = routeMap.get(schedule.routeId._id.toString());
-
-        let calculatedFare = scheduleObj.baseFare;
-
-        if (routeInfo) {
-            const segmentDistance = routeInfo.droppingStop.distanceFromSource - routeInfo.boardingStop.distanceFromSource;
-            if (routeInfo.farePerKm > 0 && segmentDistance > 0) {
-                calculatedFare = Math.round(routeInfo.farePerKm * segmentDistance);
-            }
-        }
-
-        const filteredBoardingPoints = (scheduleObj.boardingPoints || []).filter(
-            (bp) => fromRegex.test(bp.city)
-        ).map(bp => ({
-            id: bp._id,
-            city: bp.city,
-            name: bp.name,
-            time: bp.time,
-            address: bp.address,
-            landmark: bp.landmark
-        }));
-
-        const filteredDroppingPoints = (scheduleObj.droppingPoints || []).filter(
-            (dp) => toRegex.test(dp.city)
-        ).map(dp => ({
-            id: dp._id,
-            city: dp.city,
-            name: dp.name,
-            time: dp.time,
-            address: dp.address,
-            landmark: dp.landmark
-        }));
-
-        const cancellationPolicy = (scheduleObj.cancellationPolicy || []).map(cp => ({
-            hoursBeforeDeparture: cp.hoursBeforeDeparture,
-            refundPercentage: cp.refundPercentage
-        }));
-
-        return {
-            scheduleId: scheduleObj._id,
-            operator: {
-                id: scheduleObj.operatorId,
-                name: scheduleObj.busId?.operatorName || "Unknown"
-            },
-            bus: {
-                id: scheduleObj.busId?._id,
-                name: scheduleObj.busId?.busName,
-                number: scheduleObj.busId?.busNumber,
-                type: scheduleObj.busId?.busType,
-                layout: scheduleObj.busId?.seatLayoutType,
-                isAC: scheduleObj.busId?.isAC,
-                isSleeper: scheduleObj.busId?.isSleeper,
-                isSeater: scheduleObj.busId?.isSeater,
-                amenities: scheduleObj.busId?.amenities || [],
-                rating: scheduleObj.busId?.averageRating || 0
-            },
-            journey: {
-                departureDate: scheduleObj.departureDate,
-                arrivalDate: scheduleObj.arrivalDate,
-                departureTime: scheduleObj.departureTime,
-                arrivalTime: scheduleObj.arrivalTime,
-                durationMinutes: scheduleObj.routeId?.estimatedDurationInMinutes,
-                source: routeInfo ? routeInfo.boardingStop.city : scheduleObj.routeId?.source.city,
-                destination: routeInfo ? routeInfo.droppingStop.city : scheduleObj.routeId?.destination.city
-            },
-            pricing: {
-                baseFare: scheduleObj.baseFare,
-                calculatedFare: calculatedFare
-            },
-            seats: {
-                available: scheduleObj.availableSeats,
-                total: scheduleObj.busId?.totalSeats || scheduleObj.availableSeats
-            },
-            boardingPoints: filteredBoardingPoints,
-            droppingPoints: filteredDroppingPoints,
-            cancellationPolicy: cancellationPolicy,
-            status: scheduleObj.status
-        };
-    });
-
-    // ── STEP 7: Apply price filters ──
-    if (filters.minPrice) {
-        schedules = schedules.filter(
-            (s) => s.pricing.calculatedFare >= Number(filters.minPrice)
-        );
-    }
-    if (filters.maxPrice) {
-        schedules = schedules.filter(
-            (s) => s.pricing.calculatedFare <= Number(filters.maxPrice)
-        );
-    }
-
-    // ── STEP 8: Apply sorting (if requested) ──
-    if (filters.sortBy === "price_low") {
-        schedules.sort((a, b) => a.pricing.calculatedFare - b.pricing.calculatedFare);
-    } else if (filters.sortBy === "price_high") {
-        schedules.sort((a, b) => b.pricing.calculatedFare - a.pricing.calculatedFare);
-    } else if (filters.sortBy === "rating") {
-        schedules.sort((a, b) => b.bus.rating - a.bus.rating);
-    } else if (filters.sortBy === "departure") {
-        schedules.sort((a, b) => a.journey.departureTime.localeCompare(b.journey.departureTime));
-    }
-
-    return schedules;
+  });
+  if (filters.minPrice) {
+    schedules = schedules.filter(
+      (s) => s.pricing.calculatedFare >= Number(filters.minPrice),
+    );
+  }
+  if (filters.maxPrice) {
+    schedules = schedules.filter(
+      (s) => s.pricing.calculatedFare <= Number(filters.maxPrice),
+    );
+  }
+  if (filters.sortBy === "price_low") {
+    schedules.sort(
+      (a, b) => a.pricing.calculatedFare - b.pricing.calculatedFare,
+    );
+  } else if (filters.sortBy === "price_high") {
+    schedules.sort(
+      (a, b) => b.pricing.calculatedFare - a.pricing.calculatedFare,
+    );
+  } else if (filters.sortBy === "rating") {
+    schedules.sort((a, b) => b.bus.rating - a.bus.rating);
+  } else if (filters.sortBy === "departure") {
+    schedules.sort((a, b) =>
+      a.journey.departureTime.localeCompare(b.journey.departureTime),
+    );
+  }
+  return schedules;
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SEAT BLOCKING (Phase 1)
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const blockSeatsService = async (userId, scheduleId, seatNumbers) => {
-    // 1. Fetch the schedule
-    const schedule = await Schedule.findById(scheduleId);
-    if (!schedule) {
-        throw new ApiError(404, "Schedule not found");
+  const schedule = await Schedule.findById(scheduleId);
+  if (!schedule) {
+    throw new ApiError(404, "Schedule not found");
+  }
+  const validSeats = [];
+  for (const seatNumber of seatNumbers) {
+    const seat = schedule.seats.find((s) => s.seatNumber === seatNumber);
+    if (!seat) {
+      throw new ApiError(400, `Seat ${seatNumber} does not exist on this bus.`);
     }
-
-    // 2. Validate all requested seats
-    const validSeats = [];
-    for (const seatNumber of seatNumbers) {
-        const seat = schedule.seats.find((s) => s.seatNumber === seatNumber);
-
-        if (!seat) {
-            throw new ApiError(400, `Seat ${seatNumber} does not exist on this bus.`);
-        }
-
-        if (seat.status === "BOOKED") {
-            throw new ApiError(409, `Seat ${seatNumber} is already booked.`);
-        }
-
-        // Check if it's already blocked in Redis by someone else
-        const lockKey = `seat_lock:${scheduleId}:${seatNumber}`;
-        const existingLock = await redis.get(lockKey);
-
-        if (existingLock && existingLock !== userId.toString()) {
-            throw new ApiError(409, `Seat ${seatNumber} is currently being booked by another user. Please try again later.`);
-        }
-
-        validSeats.push(seatNumber);
+    if (seat.status === "BOOKED") {
+      throw new ApiError(409, `Seat ${seatNumber} is already booked.`);
     }
-
-    // 3. Acquire Redis locks (10 minutes TTL)
-    const TTL_SECONDS = 600; // 10 minutes
-    const pipeline = redis.pipeline();
-
-    for (const seatNumber of validSeats) {
-        const lockKey = `seat_lock:${scheduleId}:${seatNumber}`;
-        pipeline.set(lockKey, userId.toString(), "EX", TTL_SECONDS);
-
-        // Also update Mongoose document so UI reflects it immediately
-        const seatIndex = schedule.seats.findIndex((s) => s.seatNumber === seatNumber);
-        if (seatIndex !== -1) {
-            schedule.seats[seatIndex].status = "BLOCKED";
-        }
+    const lockKey = `seat_lock:${scheduleId}:${seatNumber}`;
+    const existingLock = await redis.get(lockKey);
+    if (existingLock && existingLock !== userId.toString()) {
+      throw new ApiError(
+        409,
+        `Seat ${seatNumber} is currently being booked by another user. Please try again later.`,
+      );
     }
-
-    // Execute Redis pipeline
-    await pipeline.exec();
-
-    // 4. Save schedule changes
-    await schedule.save();
-
-    // 5. Schedule a delayed job to unblock seats if not booked
-    // In production, use BullMQ or AWS SQS. For this scale, a simple setTimeout works.
-    setTimeout(async () => {
-        try {
-            const sched = await Schedule.findById(scheduleId);
-            if (!sched) return;
-
-            let changed = false;
-            for (const seatNumber of validSeats) {
-                const lockKey = `seat_lock:${scheduleId}:${seatNumber}`;
-                const lockValue = await redis.get(lockKey);
-
-                // If the lock is missing (expired or deleted by booking)
-                if (!lockValue) {
-                    const seatIndex = sched.seats.findIndex((s) => s.seatNumber === seatNumber);
-                    // Only revert if it's still BLOCKED (not BOOKED by the booking service)
-                    if (seatIndex !== -1 && sched.seats[seatIndex].status === "BLOCKED") {
-                        sched.seats[seatIndex].status = "AVAILABLE";
-                        changed = true;
-                    }
-                }
+    validSeats.push(seatNumber);
+  }
+  const TTL_SECONDS = 600;
+  const pipeline = redis.pipeline();
+  for (const seatNumber of validSeats) {
+    const lockKey = `seat_lock:${scheduleId}:${seatNumber}`;
+    pipeline.set(lockKey, userId.toString(), "EX", TTL_SECONDS);
+    const seatIndex = schedule.seats.findIndex(
+      (s) => s.seatNumber === seatNumber,
+    );
+    if (seatIndex !== -1) {
+      schedule.seats[seatIndex].status = "BLOCKED";
+    }
+  }
+  await pipeline.exec();
+  await schedule.save();
+  setTimeout(
+    async () => {
+      try {
+        const sched = await Schedule.findById(scheduleId);
+        if (!sched) return;
+        let changed = false;
+        for (const seatNumber of validSeats) {
+          const lockKey = `seat_lock:${scheduleId}:${seatNumber}`;
+          const lockValue = await redis.get(lockKey);
+          if (!lockValue) {
+            const seatIndex = sched.seats.findIndex(
+              (s) => s.seatNumber === seatNumber,
+            );
+            if (
+              seatIndex !== -1 &&
+              sched.seats[seatIndex].status === "BLOCKED"
+            ) {
+              sched.seats[seatIndex].status = "AVAILABLE";
+              changed = true;
             }
-            if (changed) await sched.save();
-        } catch (error) {
-            console.error("Error in seat unblocking job:", error);
+          }
         }
-    }, (TTL_SECONDS + 5) * 1000); // Wait slightly longer than TTL
-
-    const expiresAt = new Date(Date.now() + TTL_SECONDS * 1000);
-    return {
-        message: "Seats blocked successfully for 10 minutes.",
-        expiresAt
-    };
+        if (changed) await sched.save();
+      } catch (error) {
+        console.error("Error in seat unblocking job:", error);
+      }
+    },
+    (TTL_SECONDS + 5) * 1000,
+  );
+  const expiresAt = new Date(Date.now() + TTL_SECONDS * 1000);
+  return {
+    message: "Seats blocked successfully for 10 minutes.",
+    expiresAt,
+  };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SCHEDULE CANCEL (Vendor-only)
-// ─────────────────────────────────────────────────────────────────────────────
-//
-// What this does:
-//   1. Verifies the schedule exists and belongs to this vendor
-//   2. Prevents cancelling an already-cancelled or completed schedule
-//   3. Finds all CONFIRMED bookings on this schedule
-//   4. Cancels each booking and issues a 100% refund (vendor's fault = full refund)
-//   5. Marks the schedule status as "CANCELLED"
-//
-// WHY 100% REFUND:
-//   When the vendor cancels, the passenger has no fault. Industry standard
-//   (Redbus, MakeMyTrip) is always a full refund on operator cancellations.
-//
-// ─────────────────────────────────────────────────────────────────────────────
 export const cancelScheduleService = async (operatorId, scheduleId) => {
-    // 1. Fetch schedule and verify ownership
-    const schedule = await Schedule.findById(scheduleId);
-    if (!schedule) throw new ApiError(404, "Schedule not found.");
-
-    if (schedule.operatorId.toString() !== operatorId.toString()) {
-        throw new ApiError(403, "You can only cancel your own schedules.");
-    }
-
-    // 2. Guard against cancelling already-terminal states
-    if (schedule.status === "CANCELLED") {
-        throw new ApiError(409, "This schedule is already cancelled.");
-    }
-    if (schedule.status === "COMPLETED") {
-        throw new ApiError(400, "A completed schedule cannot be cancelled.");
-    }
-    if (schedule.status === "IN_TRANSIT") {
-        throw new ApiError(400, "Cannot cancel a schedule that is currently in transit.");
-    }
-
-    // 3. Find all confirmed bookings on this schedule
-    const affectedBookings = await Booking.find({
-        scheduleId,
-        bookingStatus: "CONFIRMED",
-    });
-
-    // 4. Cancel each booking with a full refund (vendor-initiated = 100% refund)
-    const cancelledCount = affectedBookings.length;
-    for (const booking of affectedBookings) {
-        booking.bookingStatus = "CANCELLED";
-        booking.paymentStatus = "REFUNDED";
-        booking.refundAmount = booking.totalFare; // 100% refund
-        booking.cancelledAt = new Date();
-        await booking.save();
-    }
-
-    // 5. Mark schedule as cancelled
-    schedule.status = "CANCELLED";
-    await schedule.save();
-
-    return {
-        scheduleId,
-        cancelledBookings: cancelledCount,
-        message: cancelledCount > 0
-            ? `Schedule cancelled. ${cancelledCount} booking(s) have been refunded in full.`
-            : "Schedule cancelled. No active bookings were affected.",
-    };
+  const schedule = await Schedule.findById(scheduleId);
+  if (!schedule) throw new ApiError(404, "Schedule not found.");
+  if (schedule.operatorId.toString() !== operatorId.toString()) {
+    throw new ApiError(403, "You can only cancel your own schedules.");
+  }
+  if (schedule.status === "CANCELLED") {
+    throw new ApiError(409, "This schedule is already cancelled.");
+  }
+  if (schedule.status === "COMPLETED") {
+    throw new ApiError(400, "A completed schedule cannot be cancelled.");
+  }
+  if (schedule.status === "IN_TRANSIT") {
+    throw new ApiError(
+      400,
+      "Cannot cancel a schedule that is currently in transit.",
+    );
+  }
+  const affectedBookings = await Booking.find({
+    scheduleId,
+    bookingStatus: "CONFIRMED",
+  });
+  const cancelledCount = affectedBookings.length;
+  for (const booking of affectedBookings) {
+    booking.bookingStatus = "CANCELLED";
+    booking.paymentStatus = "REFUNDED";
+    booking.refundAmount = booking.totalFare;
+    booking.cancelledAt = new Date();
+    await booking.save();
+  }
+  schedule.status = "CANCELLED";
+  await schedule.save();
+  return {
+    scheduleId,
+    cancelledBookings: cancelledCount,
+    message:
+      cancelledCount > 0
+        ? `Schedule cancelled. ${cancelledCount} booking(s) have been refunded in full.`
+        : "Schedule cancelled. No active bookings were affected.",
+  };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// REVIEWS AND RATINGS (Phase 5)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const addReviewService = async (userId, busId, bookingId, rating, reviewText) => {
-    // 1. Verify bus exists
-    const bus = await Bus.findById(busId);
-    if (!bus) throw new ApiError(404, "Bus not found");
-
-    // 2. Prevent duplicate reviews for the same booking
-    const existingReview = await Review.findOne({ bookingId });
-    if (existingReview) {
-        throw new ApiError(409, "You have already reviewed this trip.");
-    }
-
-    // 3. Create review
-    const review = await Review.create({
-        userId,
-        busId,
-        bookingId,
-        rating,
-        review: reviewText
-    });
-
-    // 4. Update average rating on the Bus using aggregation
-    const stats = await Review.aggregate([
-        { $match: { busId: bus._id } },
-        {
-            $group: {
-                _id: "$busId",
-                avgRating: { $avg: "$rating" },
-                totalRatings: { $sum: 1 }
-            }
-        }
-    ]);
-
-    if (stats.length > 0) {
-        bus.averageRating = Math.round(stats[0].avgRating * 10) / 10; // Round to 1 decimal
-        bus.totalRatings = stats[0].totalRatings;
-        await bus.save();
-    }
-
-    return review;
+export const addReviewService = async (
+  userId,
+  busId,
+  bookingId,
+  rating,
+  reviewText,
+) => {
+  const bus = await Bus.findById(busId);
+  if (!bus) throw new ApiError(404, "Bus not found");
+  const existingReview = await Review.findOne({
+    bookingId,
+  });
+  if (existingReview) {
+    throw new ApiError(409, "You have already reviewed this trip.");
+  }
+  const review = await Review.create({
+    userId,
+    busId,
+    bookingId,
+    rating,
+    review: reviewText,
+  });
+  const stats = await Review.aggregate([
+    {
+      $match: {
+        busId: bus._id,
+      },
+    },
+    {
+      $group: {
+        _id: "$busId",
+        avgRating: {
+          $avg: "$rating",
+        },
+        totalRatings: {
+          $sum: 1,
+        },
+      },
+    },
+  ]);
+  if (stats.length > 0) {
+    bus.averageRating = Math.round(stats[0].avgRating * 10) / 10;
+    bus.totalRatings = stats[0].totalRatings;
+    await bus.save();
+  }
+  return review;
 };
