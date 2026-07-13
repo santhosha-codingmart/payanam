@@ -888,7 +888,7 @@ const cityPoints = {
 
 function getDateRange() {
   const dates = [];
-  const start = new Date("2026-06-29");
+  const start = new Date("2026-07-13");
   for (let i = 0; i < 7; i++) {
     const d = new Date(start);
     d.setDate(d.getDate() + i);

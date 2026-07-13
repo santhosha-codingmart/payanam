@@ -334,8 +334,8 @@ async function seedFlights() {
     }
     console.log(`Created ${routes.length} routes`);
     let scheduleCount = 0;
-    const today = new Date();
-    for (let d = 1; d <= 7; d++) {
+    const today = new Date("2026-07-13");
+    for (let d = 0; d < 7; d++) {
       const date = new Date(today);
       date.setDate(date.getDate() + d);
       const dailySchedules = [];
