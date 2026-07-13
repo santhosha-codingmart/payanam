@@ -288,7 +288,16 @@ export const listVendorsService = async (filters = {}) => {
     User.countDocuments(query),
   ]);
   return {
-    vendors,
+    vendors: vendors.map(v => ({
+      _id: v._id,
+      name: v.name,
+      companyName: v.companyName,
+      email: v.email,
+      gstNumber: v.gstNumber,
+      vendorApprovalStatus: v.vendorApprovalStatus,
+      rejectionReason: v.rejectionReason || "",
+      isActive: v.isActive,
+    })),
     pagination: {
       totalCount,
       totalPages: Math.ceil(totalCount / limitNum),
@@ -322,13 +331,14 @@ export const rejectVendorService = async (vendorId, reason) => {
   if (vendor.role !== "vendor")
     throw new ApiError(400, "This user is not a vendor.");
   vendor.vendorApprovalStatus = "REJECTED";
+  vendor.rejectionReason = reason || "No reason provided.";
   await vendor.save();
   return {
     vendorId: vendor._id,
     name: vendor.name,
     email: vendor.email,
     vendorApprovalStatus: vendor.vendorApprovalStatus,
-    reason: reason || "No reason provided.",
+    rejectionReason: vendor.rejectionReason,
     message: "Vendor application rejected.",
   };
 };

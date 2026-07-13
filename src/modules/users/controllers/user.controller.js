@@ -2,6 +2,7 @@ import {
   getUserProfile,
   updateUserProfile,
   getVendorDashboardService,
+  requestVendorReapproval,
 } from "../services/user.service.js";
 import {
   uploadToCloudinary,
@@ -46,6 +47,19 @@ export const getVendorDashboard = async (req, res, next) => {
       success: true,
       message: "Dashboard summary fetched successfully.",
       data: summary,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const requestReapproval = async (req, res, next) => {
+  try {
+    const result = await requestVendorReapproval(req.user._id);
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result,
     });
   } catch (error) {
     return next(error);

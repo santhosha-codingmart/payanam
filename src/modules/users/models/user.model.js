@@ -64,6 +64,11 @@ let userSchema = mongoose.Schema(
       enum: ["PENDING", "APPROVED", "REJECTED"],
       default: "PENDING",
     },
+    rejectionReason: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     isActive: {
       type: Boolean,
       default: true,

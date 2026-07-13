@@ -140,3 +140,26 @@ export const getVendorDashboardService = async (operatorId) => {
     },
   };
 };
+
+export const requestVendorReapproval = async (vendorId) => {
+  const vendor = await User.findById(vendorId);
+  if (!vendor) {
+    throw new ApiError(404, "Vendor not found.");
+  }
+  if (vendor.role !== "vendor") {
+    throw new ApiError(400, "This user is not a vendor.");
+  }
+  if (vendor.vendorApprovalStatus !== "REJECTED") {
+    throw new ApiError(400, "Only rejected vendors can request re-approval.");
+  }
+  vendor.vendorApprovalStatus = "PENDING";
+  vendor.rejectionReason = "";
+  await vendor.save();
+  return {
+    vendorId: vendor._id,
+    name: vendor.name,
+    email: vendor.email,
+    vendorApprovalStatus: vendor.vendorApprovalStatus,
+    message: "Your re-approval request has been submitted. Please wait for admin review.",
+  };
+};
