@@ -1,7 +1,4 @@
-import dotenv from "dotenv";
-
-dotenv.config();
-const NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
+import aiConfig from "../../../config/ai.js";
 
 export const aiChatController = async (req, res) => {
   try {
@@ -13,7 +10,7 @@ export const aiChatController = async (req, res) => {
         error: "message is required",
       });
     }
-    if (!process.env.NVIDIA_API_KEY) {
+    if (!aiConfig.nvidia.apiKey) {
       return res.status(500).json({
         success: false,
         error: "NVIDIA_API_KEY not configured",
@@ -23,7 +20,7 @@ export const aiChatController = async (req, res) => {
 
 Extract travel details from the user's sentence.
 
-Today's date is 2026-07-04.
+Today's date is ${new Date().toISOString().split("T")[0]}.
 
 Return ONLY valid JSON.
 
@@ -39,25 +36,24 @@ Rules:
 - No extra text.
 - If a field is missing, return an empty string.
 - Convert relative dates like "tomorrow" into YYYY-MM-DD.}`;
-    const response = await fetch(NVIDIA_BASE_URL, {
+
+    const { userChat } = aiConfig.models;
+
+    const response = await fetch(aiConfig.nvidia.baseUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.NVIDIA_API_KEY}`,
-        Accept: "application/json",
-      },
+      headers: aiConfig.getHeaders(),
       body: JSON.stringify({
-        model: "google/gemma-2-2b-it",
+        model: userChat.name,
         messages: [
           {
             role: "user",
             content: message + " " + sys_instruction,
           },
         ],
-        temperature: 0.2,
-        top_p: 0.7,
-        max_tokens: 1024,
-        stream: false,
+        temperature: userChat.temperature,
+        top_p: userChat.topP,
+        max_tokens: userChat.maxTokens,
+        stream: userChat.stream,
       }),
     });
     if (!response.ok) {

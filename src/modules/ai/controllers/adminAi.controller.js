@@ -1,12 +1,8 @@
-import dotenv from "dotenv";
+import aiConfig from "../../../config/ai.js";
 import User from "../../users/models/user.model.js";
 import { Bus } from "../../bus/models/bus.model.js";
 import { Aircraft } from "../../flights/models/aircraft.model.js";
 import Booking from "../../bookings/models/booking.model.js";
-
-dotenv.config();
-
-const NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 
 /**
  * Gather platform data to provide context to the AI
@@ -60,19 +56,15 @@ const gatherPlatformData = async () => {
             { $match: { bookingStatus: "CONFIRMED", bookedAt: { $gte: startOfMonth } } },
             { $group: { _id: null, total: { $sum: "$totalFare" } } },
         ]),
-        // Bus revenue (bookingId starts with PAY-)
         Booking.aggregate([
             { $match: { bookingStatus: "CONFIRMED", bookingId: /^PAY-/ } },
             { $group: { _id: null, total: { $sum: "$totalFare" } } },
         ]),
-        // Flight revenue (bookingId starts with FLY-)
         Booking.aggregate([
             { $match: { bookingStatus: "CONFIRMED", bookingId: /^FLY-/ } },
             { $group: { _id: null, total: { $sum: "$totalFare" } } },
         ]),
-        // Bus bookings count
         Booking.countDocuments({ bookingId: /^PAY-/ }),
-        // Flight bookings count
         Booking.countDocuments({ bookingId: /^FLY-/ }),
         User.find({ role: "user" }).select("name email createdAt").sort({ createdAt: -1 }).limit(5),
         User.find({ role: "vendor" }).select("name email companyName vendorApprovalStatus createdAt").sort({ createdAt: -1 }).limit(5),
@@ -146,11 +138,10 @@ export const adminAiChatController = async (req, res) => {
             return res.status(400).json({ success: false, error: "message is required" });
         }
 
-        if (!process.env.NVIDIA_API_KEY) {
+        if (!aiConfig.nvidia.apiKey) {
             return res.status(500).json({ success: false, error: "NVIDIA_API_KEY not configured" });
         }
 
-        // Gather platform data for context
         let platformData;
         try {
             platformData = await gatherPlatformData();
@@ -193,23 +184,21 @@ Example questions you can answer:
 - "Which service has more bookings?"
 - "Compare this month's performance"`;
 
-        const response = await fetch(NVIDIA_BASE_URL, {
+        const { adminChat } = aiConfig.models;
+
+        const response = await fetch(aiConfig.nvidia.baseUrl, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${process.env.NVIDIA_API_KEY}`,
-                Accept: "application/json",
-            },
+            headers: aiConfig.getHeaders(),
             body: JSON.stringify({
-                model: "meta/llama-3.1-8b-instruct",
+                model: adminChat.name,
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: message }
                 ],
-                temperature: 0.5,
-                top_p: 0.8,
-                max_tokens: 2048,
-                stream: false,
+                temperature: adminChat.temperature,
+                top_p: adminChat.topP,
+                max_tokens: adminChat.maxTokens,
+                stream: adminChat.stream,
             }),
         });
 
