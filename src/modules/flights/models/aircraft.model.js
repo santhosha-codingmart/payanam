@@ -86,7 +86,7 @@ const aircraftSchema = new mongoose.Schema(
     cabinClasses: [
       {
         type: String,
-        enum: ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"],
+        enum: ["ECONOMY", "PREMIUM_ECONOMY", "STANDARD_ECONOMY", "BUSINESS", "BUSINESS_SAVER", "FIRST"],
       },
     ],
     totalSeats: {
@@ -102,7 +102,15 @@ const aircraftSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    standardEconomySeats: {
+      type: Number,
+      default: 0,
+    },
     businessSeats: {
+      type: Number,
+      default: 0,
+    },
+    businessSaverSeats: {
       type: Number,
       default: 0,
     },
@@ -118,7 +126,7 @@ const aircraftSchema = new mongoose.Schema(
         },
         cabinClass: {
           type: String,
-          enum: ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"],
+          enum: ["ECONOMY", "PREMIUM_ECONOMY", "STANDARD_ECONOMY", "BUSINESS", "BUSINESS_SAVER", "FIRST"],
           required: true,
         },
         seatType: {
@@ -267,11 +275,13 @@ aircraftSchema.pre("save", function () {
   const calculatedTotal =
     (this.economySeats || 0) +
     (this.premiumEconomySeats || 0) +
+    (this.standardEconomySeats || 0) +
     (this.businessSeats || 0) +
+    (this.businessSaverSeats || 0) +
     (this.firstClassSeats || 0);
   if (this.totalSeats !== calculatedTotal) {
     throw new Error(
-      `Total seats (${this.totalSeats}) must equal the sum of economy (${this.economySeats}), premium economy (${this.premiumEconomySeats}), business (${this.businessSeats}), and first class (${this.firstClassSeats}) seats.`,
+      `Total seats (${this.totalSeats}) must equal the sum of economy (${this.economySeats}), premium economy (${this.premiumEconomySeats}), standard economy (${this.standardEconomySeats}), business (${this.businessSeats}), business saver (${this.businessSaverSeats}), and first class (${this.firstClassSeats}) seats.`,
     );
   }
   if (this.cabinClasses && this.cabinClasses.length > 0) {

@@ -60,7 +60,7 @@ const flightScheduleSchema = new mongoose.Schema(
         },
         cabinClass: {
           type: String,
-          enum: ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"],
+          enum: ["ECONOMY", "PREMIUM_ECONOMY", "STANDARD_ECONOMY", "BUSINESS", "BUSINESS_SAVER", "FIRST"],
           default: "ECONOMY",
         },
         seatType: {

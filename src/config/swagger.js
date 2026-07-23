@@ -2249,7 +2249,7 @@ const options = {
             },
             cabinClass: {
               type: "string",
-              enum: ["ECONOMY", "BUSINESS", "FIRST"],
+              enum: ["ECONOMY", "PREMIUM_ECONOMY", "STANDARD_ECONOMY", "BUSINESS", "BUSINESS_SAVER", "FIRST"],
               example: "ECONOMY",
             },
             seatType: {
@@ -2432,7 +2432,7 @@ const options = {
               type: "array",
               items: {
                 type: "string",
-                enum: ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"],
+                enum: ["ECONOMY", "PREMIUM_ECONOMY", "STANDARD_ECONOMY", "BUSINESS", "BUSINESS_SAVER", "FIRST"],
               },
               example: ["ECONOMY", "BUSINESS"],
             },
@@ -2449,9 +2449,17 @@ const options = {
               type: "integer",
               example: 0,
             },
+            standardEconomySeats: {
+              type: "integer",
+              example: 0,
+            },
             businessSeats: {
               type: "integer",
               example: 18,
+            },
+            businessSaverSeats: {
+              type: "integer",
+              example: 0,
             },
             firstClassSeats: {
               type: "integer",
@@ -2636,7 +2644,15 @@ const options = {
                   type: "integer",
                   example: 0,
                 },
+                standardEconomySeats: {
+                  type: "integer",
+                  example: 0,
+                },
                 businessSeats: {
+                  type: "integer",
+                  example: 0,
+                },
+                businessSaverSeats: {
                   type: "integer",
                   example: 0,
                 },
@@ -3201,7 +3217,7 @@ const options = {
                       },
                       cabinClass: {
                         type: "string",
-                        enum: ["ECONOMY", "BUSINESS", "FIRST"],
+                        enum: ["ECONOMY", "PREMIUM_ECONOMY", "STANDARD_ECONOMY", "BUSINESS", "BUSINESS_SAVER", "FIRST"],
                         example: "ECONOMY",
                       },
                       seatType: {

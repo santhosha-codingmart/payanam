@@ -15,7 +15,7 @@ const iataCode = z
 const seatLayoutItemSchema = z.object({
   seatNumber: z.string().min(1, "Seat number is required"),
   cabinClass: z
-    .enum(["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"])
+    .enum(["ECONOMY", "PREMIUM_ECONOMY", "STANDARD_ECONOMY", "BUSINESS", "BUSINESS_SAVER", "FIRST"])
     .optional()
     .default("ECONOMY"),
   seatType: z.enum(["window", "aisle", "middle"]).optional().default("aisle"),
@@ -101,12 +101,14 @@ export const createFlightSchema = z.object({
       "DASH8_Q400",
     ]),
     cabinClasses: z
-      .array(z.enum(["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"]))
+      .array(z.enum(["ECONOMY", "PREMIUM_ECONOMY", "STANDARD_ECONOMY", "BUSINESS", "BUSINESS_SAVER", "FIRST"]))
       .min(1, "At least one cabin class must be provided"),
     totalSeats: z.number().int().min(1).max(500),
     economySeats: z.number().int().min(0).optional(),
     premiumEconomySeats: z.number().int().min(0).optional(),
+    standardEconomySeats: z.number().int().min(0).optional(),
     businessSeats: z.number().int().min(0).optional(),
+    businessSaverSeats: z.number().int().min(0).optional(),
     firstClassSeats: z.number().int().min(0).optional(),
     amenities: z
       .array(
@@ -201,7 +203,7 @@ export const updateFlightSchema = z.object({
       ])
       .optional(),
     cabinClasses: z
-      .array(z.enum(["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"]))
+      .array(z.enum(["ECONOMY", "PREMIUM_ECONOMY", "STANDARD_ECONOMY", "BUSINESS", "BUSINESS_SAVER", "FIRST"]))
       .optional(),
     totalSeats: z.number().int().min(1).max(500).optional(),
     amenities: z
